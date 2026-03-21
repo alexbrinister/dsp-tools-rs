@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use std::fmt;
 
+mod signal;
+
 #[derive(Parser)]
 #[command(name = "DSP CLI")]
 #[command(version = "0.1.0")]
@@ -23,7 +25,7 @@ enum Command {
         frequency: f64,
 
         #[arg(short, long)]
-        duration: u64,
+        duration: f64,
     },
 
     Ft {
@@ -87,6 +89,18 @@ fn main() {
             println!("{:>4}sample rate: {:?}", "", sample_rate);
             println!("{:>4}frequency: {:?}", "", frequency);
             println!("{:>4}duration: {:?}", "", duration);
+
+            match function {
+                SignalFunction::Sine => {
+                    let out = signal::generate_sine(*frequency, *duration, *sample_rate);
+                    println!("result:");
+                    println!("{:?}", out);
+                }
+
+                _ => {
+                    println!("under construction!");
+                }
+            }
         }
 
         Command::Ft {
