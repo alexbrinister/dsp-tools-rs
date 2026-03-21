@@ -97,6 +97,12 @@ fn main() {
                     println!("{:?}", out);
                 }
 
+                SignalFunction::Square => {
+                    let out = signal::generate_square(*frequency, *duration, *sample_rate);
+                    println!("result:");
+                    println!("{:?}", out);
+                }
+
                 _ => {
                     println!("under construction!");
                 }
