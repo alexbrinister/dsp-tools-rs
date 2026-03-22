@@ -91,31 +91,33 @@ fn main() {
             eprintln!("{:>4}frequency: {:?}", "", frequency);
             eprintln!("{:>4}duration: {:?}", "", duration);
 
-            match function {
-                SignalFunction::Sine => {
-                    let out = signal::generate_sine(*frequency, *duration, *sample_rate);
-                    write_to_stdout(&out);
+            let out = match function {
+                SignalFunction::Sine => signal::generate_sine(*frequency, *duration, *sample_rate),
+
+                SignalFunction::Cosine => {
+                    signal::generate_cosine(*frequency, *duration, *sample_rate)
                 }
 
                 SignalFunction::Square => {
-                    let out = signal::generate_square(*frequency, *duration, *sample_rate);
-                    write_to_stdout(&out);
+                    signal::generate_square(*frequency, *duration, *sample_rate)
                 }
 
-                _ => {
-                    println!("under construction!");
-                }
-            }
+                SignalFunction::NoiseW => signal::generate_white_noise(*duration, *sample_rate),
+
+                SignalFunction::NoiseG => signal::generate_gaussian_noise(*duration, *sample_rate),
+            };
+
+            write_to_stdout(&out);
         }
 
         Command::Ft {
             transform_type,
             output_format,
         } => {
-            println!("ft command invoked!");
-            println!("args:");
-            println!("{:>4}transform type: {:?}", "", transform_type);
-            println!("{:>4}output format: {:?}", "", output_format);
+            eprintln!("ft command invoked!");
+            eprintln!("args:");
+            eprintln!("{:>4}transform type: {:?}", "", transform_type);
+            eprintln!("{:>4}output format: {:?}", "", output_format);
         }
     }
 }
