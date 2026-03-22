@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use std::fmt;
+use std::io::Write;
 
 mod signal;
 
@@ -83,24 +84,22 @@ fn main() {
             frequency,
             duration,
         } => {
-            println!("signal command invoked!");
-            println!("args:");
-            println!("{:>4}function: {:?}", "", function);
-            println!("{:>4}sample rate: {:?}", "", sample_rate);
-            println!("{:>4}frequency: {:?}", "", frequency);
-            println!("{:>4}duration: {:?}", "", duration);
+            eprintln!("signal command invoked!");
+            eprintln!("args:");
+            eprintln!("{:>4}function: {:?}", "", function);
+            eprintln!("{:>4}sample rate: {:?}", "", sample_rate);
+            eprintln!("{:>4}frequency: {:?}", "", frequency);
+            eprintln!("{:>4}duration: {:?}", "", duration);
 
             match function {
                 SignalFunction::Sine => {
                     let out = signal::generate_sine(*frequency, *duration, *sample_rate);
-                    println!("result:");
-                    println!("{:?}", out);
+                    write_to_stdout(&out);
                 }
 
                 SignalFunction::Square => {
                     let out = signal::generate_square(*frequency, *duration, *sample_rate);
-                    println!("result:");
-                    println!("{:?}", out);
+                    write_to_stdout(&out);
                 }
 
                 _ => {
@@ -119,4 +118,16 @@ fn main() {
             println!("{:>4}output format: {:?}", "", output_format);
         }
     }
+}
+
+fn write_to_stdout(data: &[f64]) {
+    let mut stdout = std::io::stdout().lock();
+
+    for val in data {
+        stdout
+            .write_all(&val.to_le_bytes())
+            .expect("Failed to write wave to stdout");
+    }
+
+    stdout.flush().expect("Failed to flush stdout");
 }
