@@ -1,8 +1,10 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use clap::{Parser, Subcommand, ValueEnum};
+use num_complex::Complex;
 use std::fmt;
 use std::io::Write;
 
+mod ft;
 mod signal;
 
 #[derive(Parser)]
@@ -122,8 +124,16 @@ fn main() {
 
             let data = read_from_stdin();
 
-            eprintln!("Data read:");
-            println!("{:?}", data);
+            let out = match transform_type {
+                TransformType::Dft => ft::dft(&data),
+                _ => {
+                    eprintln!("under construction!");
+                    vec![Complex::new(1.0, 1.0)]
+                }
+            };
+
+            let formatted_out = format_output(&out, output_format.clone());
+            write_to_stdout(&formatted_out);
         }
     }
 }
@@ -167,4 +177,13 @@ fn read_from_stdin() -> Vec<f64> {
     }
 
     data
+}
+
+fn format_output(complex_data: &[Complex<f64>], output_format: OutputFormat) -> Vec<f64> {
+    match output_format {
+        OutputFormat::Magnitude => complex_data.iter().map(|c| c.norm()).collect(),
+        OutputFormat::Power => complex_data.iter().map(|c| c.norm_sqr()).collect(),
+        OutputFormat::Phase => complex_data.iter().map(|c| c.arg()).collect(),
+        OutputFormat::Complex => complex_data.iter().flat_map(|c| [c.re, c.im]).collect(),
+    }
 }
