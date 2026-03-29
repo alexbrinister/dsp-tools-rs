@@ -1,3 +1,4 @@
+use byteorder::{LittleEndian, ReadBytesExt};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::fmt;
 use std::io::Write;
@@ -118,6 +119,11 @@ fn main() {
             eprintln!("args:");
             eprintln!("{:>4}transform type: {:?}", "", transform_type);
             eprintln!("{:>4}output format: {:?}", "", output_format);
+
+            let data = read_from_stdin();
+
+            eprintln!("Data read:");
+            println!("{:?}", data);
         }
     }
 }
@@ -132,4 +138,33 @@ fn write_to_stdout(data: &[f64]) {
     }
 
     stdout.flush().expect("Failed to flush stdout");
+}
+
+fn read_from_stdin() -> Vec<f64> {
+    // take in no more than 65536 values
+    const UPPER_INPUT_BOUND: usize = 1 << 16;
+    let mut data = Vec::with_capacity(UPPER_INPUT_BOUND);
+    let mut stdin = std::io::stdin().lock();
+    let mut count: usize = 0;
+
+    while count < UPPER_INPUT_BOUND {
+        let result = stdin.read_f64::<LittleEndian>();
+
+        match result {
+            // if we get EOF, then leave the loop
+            // if any other error, we panic
+            Err(error) => match error.kind() {
+                std::io::ErrorKind::UnexpectedEof => break,
+                _ => panic!("Couldn't read from stdin"),
+            },
+
+            // if we get a good result, add it to the output vector
+            Ok(result) => {
+                data.push(result);
+                count += 1;
+            }
+        }
+    }
+
+    data
 }
