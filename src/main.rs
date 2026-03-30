@@ -126,10 +126,7 @@ fn main() {
 
             let out = match transform_type {
                 TransformType::Dft => ft::dft(&data),
-                _ => {
-                    eprintln!("under construction!");
-                    vec![Complex::new(1.0, 1.0)]
-                }
+                TransformType::Fft => ft::fft(&data),
             };
 
             let formatted_out = format_output(&out, output_format.clone());
