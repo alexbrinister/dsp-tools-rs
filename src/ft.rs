@@ -22,13 +22,6 @@ pub fn dft(input: &[f64]) -> Vec<Complex<f64>> {
 pub fn fft(input: &[f64]) -> Vec<Complex<f64>> {
     let n: usize = input.len();
 
-    // Guard against non-power-of-two inputs
-    assert!(
-        n.is_power_of_two(),
-        "FFT input length must be a power of 2! Received: {}",
-        n
-    );
-
     // base case
     if n <= 1 {
         return vec![Complex::new(input[0], 0.0)];

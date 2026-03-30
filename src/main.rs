@@ -122,11 +122,15 @@ fn main() {
             eprintln!("{:>4}transform type: {:?}", "", transform_type);
             eprintln!("{:>4}output format: {:?}", "", output_format);
 
-            let data = read_from_stdin();
+            let mut data = read_from_stdin();
 
             let out = match transform_type {
                 TransformType::Dft => ft::dft(&data),
-                TransformType::Fft => ft::fft(&data),
+                TransformType::Fft => {
+                    // Guard against non-power-of-two inputs by zero-padding the data
+                    pad_to_pow2(&mut data);
+                    ft::fft(&data)
+                }
             };
 
             let formatted_out = format_output(&out, output_format.clone());
@@ -182,5 +186,16 @@ fn format_output(complex_data: &[Complex<f64>], output_format: OutputFormat) -> 
         OutputFormat::Power => complex_data.iter().map(|c| c.norm_sqr()).collect(),
         OutputFormat::Phase => complex_data.iter().map(|c| c.arg()).collect(),
         OutputFormat::Complex => complex_data.iter().flat_map(|c| [c.re, c.im]).collect(),
+    }
+}
+
+fn pad_to_pow2(data: &mut Vec<f64>) {
+    let n: usize = data.len();
+
+    // not a power of two
+    // find new size (next power of two) and resize data in-place
+    if n > 0 && !n.is_power_of_two() {
+        let new_byte_count = n.next_power_of_two();
+        data.resize(new_byte_count, 0.0);
     }
 }
