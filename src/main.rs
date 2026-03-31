@@ -6,6 +6,7 @@ use std::io::Write;
 
 mod ft;
 mod signal;
+mod window;
 
 #[derive(Parser)]
 #[command(name = "DSP CLI")]
@@ -39,6 +40,11 @@ enum Command {
         #[arg(short, long, default_value_t = OutputFormat::Magnitude)]
         output_format: OutputFormat,
     },
+
+    Window {
+        #[arg(short = 'z', long)]
+        window_function: WindowFunction,
+    },
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -62,6 +68,13 @@ enum OutputFormat {
     Power,
     Phase,
     Complex,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+enum WindowFunction {
+    Hann,
+    Hamming,
+    Blackman,
 }
 
 impl fmt::Display for OutputFormat {
@@ -135,6 +148,22 @@ fn main() {
 
             let formatted_out = format_output(&out, output_format.clone());
             write_to_stdout(&formatted_out);
+        }
+
+        Command::Window { window_function } => {
+            eprintln!("window command invoked!");
+            eprintln!("args:");
+            eprintln!("{:>4}window function: {:?}", "", window_function);
+
+            let mut data = read_from_stdin();
+
+            match window_function {
+                WindowFunction::Hann => window::apply_hann(&mut data),
+                WindowFunction::Hamming => window::apply_hamming(&mut data),
+                WindowFunction::Blackman => window::apply_blackman(&mut data),
+            };
+
+            write_to_stdout(&data);
         }
     }
 }
