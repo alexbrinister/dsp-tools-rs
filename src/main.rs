@@ -46,6 +46,23 @@ enum Command {
         #[arg(short = 'z', long)]
         window_function: WindowFunction,
     },
+
+    Filter {
+        #[arg(short, long)]
+        filter_type: FilterType,
+
+        #[arg(short, long)]
+        cutoff: f64,
+
+        #[arg(short, long)]
+        sample_rate: f64,
+
+        #[arg(short = 'n', long)]
+        taps: usize,
+
+        #[arg(short = 'z', long)]
+        window_function: WindowFunction,
+    },
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -76,6 +93,11 @@ enum WindowFunction {
     Hann,
     Hamming,
     Blackman,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+enum FilterType {
+    LowPass,
 }
 
 impl fmt::Display for OutputFormat {
@@ -165,6 +187,32 @@ fn main() {
             };
 
             write_to_stdout(&data);
+        }
+
+        Command::Filter {
+            filter_type,
+            cutoff,
+            sample_rate,
+            taps,
+            window_function,
+        } => {
+            eprintln!("filter command invoked!");
+            eprintln!("args:");
+            eprintln!("{:>4}cutoff frequency: {:?}", "", cutoff);
+            eprintln!("{:>4}sample rate: {:?}", "", sample_rate);
+            eprintln!("{:>4}window function: {:?}", "", window_function);
+
+            let fc = (cutoff / sample_rate).min(0.5);
+            let input = read_from_stdin();
+
+            let taps = match filter_type {
+                FilterType::LowPass => {
+                    filter::generate_low_pass(*taps, fc, window_function.clone())
+                }
+            };
+
+            let output = filter::apply_fir(&input, &taps);
+            write_to_stdout(&output);
         }
     }
 }
