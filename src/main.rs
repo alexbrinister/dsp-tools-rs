@@ -4,6 +4,7 @@ use num_complex::Complex;
 use std::fmt;
 use std::io::Write;
 
+mod filter;
 mod ft;
 mod signal;
 mod window;
