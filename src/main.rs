@@ -98,6 +98,7 @@ enum WindowFunction {
 #[derive(ValueEnum, Clone, Debug)]
 enum FilterType {
     LowPass,
+    HighPass,
 }
 
 impl fmt::Display for OutputFormat {
@@ -208,6 +209,9 @@ fn main() {
             let taps = match filter_type {
                 FilterType::LowPass => {
                     filter::generate_low_pass(*taps, fc, window_function.clone())
+                }
+                FilterType::HighPass => {
+                    filter::generate_high_pass(*taps, fc, window_function.clone())
                 }
             };
 

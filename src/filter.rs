@@ -45,3 +45,12 @@ pub fn generate_low_pass(num_taps: usize, fc: f64, window_function: WindowFuncti
 
     output
 }
+
+pub fn generate_high_pass(num_taps: usize, fc: f64, window_function: WindowFunction) -> Vec<f64> {
+    let mut low_pass: Vec<f64> = generate_low_pass(num_taps, fc, window_function);
+    let center_point: usize = (low_pass.len() - 1) / 2;
+
+    low_pass.iter_mut().for_each(|tap| *tap *= -1.0);
+    low_pass[center_point] += 1.0;
+    low_pass
+}
