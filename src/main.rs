@@ -231,9 +231,9 @@ fn main() {
             }
 
             if matches!(*filter_type, FilterType::BandPass | FilterType::Notch) {
-                if *cutoff_high <= 0.0 {
+                if !cutoff_high.is_finite() || *cutoff_high <= 0.0 {
                     eprintln!(
-                        "error: must specify a high cutoff frequency > 0.0 for band-pass and notch filters."
+                        "error: must specify a finite high cutoff frequency > 0.0 for band-pass and notch filters."
                     );
                     std::process::exit(2);
                 }
