@@ -59,6 +59,20 @@ pub fn generate_band_pass(
     fc2: f64,
     window_function: WindowFunction,
 ) -> Vec<f64> {
+    assert!(fc1.is_finite(), "lower cutoff frequency must be finite");
+    assert!(fc2.is_finite(), "upper cutoff frequency must be finite");
+    assert!(
+        (0.0..=0.5).contains(&fc1),
+        "lower cutoff frequency must be within the normalized range 0.0..=0.5"
+    );
+    assert!(
+        (0.0..=0.5).contains(&fc2),
+        "upper cutoff frequency must be within the normalized range 0.0..=0.5"
+    );
+    assert!(
+        fc1 < fc2,
+        "lower cutoff frequency must be less than upper cutoff frequency"
+    );
     let low_pass_fc1: Vec<f64> = generate_low_pass(num_taps, fc1, window_function.clone());
     let low_pass_fc2: Vec<f64> = generate_low_pass(num_taps, fc2, window_function.clone());
     low_pass_fc2
