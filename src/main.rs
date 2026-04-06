@@ -220,8 +220,8 @@ fn main() {
                 std::process::exit(2);
             }
 
-            if *cutoff_low <= 0.0 {
-                eprintln!("error: low cutoff frequency must be greater than 0");
+            if !cutoff_low.is_finite() || *cutoff_low <= 0.0 {
+                eprintln!("error: low cutoff frequency must be a finite value greater than 0");
                 std::process::exit(2);
             }
 
