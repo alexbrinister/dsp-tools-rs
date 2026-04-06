@@ -46,6 +46,26 @@ enum Command {
         #[arg(short = 'z', long)]
         window_function: WindowFunction,
     },
+
+    Filter {
+        #[arg(short, long)]
+        filter_type: FilterType,
+
+        #[arg(short = 'l', long)]
+        cutoff_low: f64,
+
+        #[arg(short = 'a', long, default_value_t = 0.0)]
+        cutoff_high: f64,
+
+        #[arg(short, long)]
+        sample_rate: f64,
+
+        #[arg(short = 'n', long)]
+        taps: usize,
+
+        #[arg(short = 'z', long, default_value_t = WindowFunction::Blackman)]
+        window_function: WindowFunction,
+    },
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -78,6 +98,14 @@ enum WindowFunction {
     Blackman,
 }
 
+#[derive(ValueEnum, Clone, Debug)]
+enum FilterType {
+    LowPass,
+    HighPass,
+    BandPass,
+    Notch,
+}
+
 impl fmt::Display for OutputFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
@@ -85,6 +113,18 @@ impl fmt::Display for OutputFormat {
             OutputFormat::Power => "power",
             OutputFormat::Phase => "phase",
             OutputFormat::Complex => "complex",
+        };
+
+        write!(f, "{}", name)
+    }
+}
+
+impl fmt::Display for WindowFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            WindowFunction::Hann => "hann",
+            WindowFunction::Hamming => "hamming",
+            WindowFunction::Blackman => "blackman",
         };
 
         write!(f, "{}", name)
@@ -154,7 +194,7 @@ fn main() {
         Command::Window { window_function } => {
             eprintln!("window command invoked!");
             eprintln!("args:");
-            eprintln!("{:>4}window function: {:?}", "", window_function);
+            eprintln!("{:>4}window function: {}", "", window_function);
 
             let mut data = read_from_stdin();
 
@@ -165,6 +205,90 @@ fn main() {
             };
 
             write_to_stdout(&data);
+        }
+
+        Command::Filter {
+            filter_type,
+            cutoff_low,
+            cutoff_high,
+            sample_rate,
+            taps,
+            window_function,
+        } => {
+            if !sample_rate.is_finite() || *sample_rate <= 0.0 {
+                eprintln!("error: sample rate must be a finite value greater than 0");
+                std::process::exit(2);
+            }
+
+            if !cutoff_low.is_finite() || *cutoff_low <= 0.0 {
+                eprintln!("error: low cutoff frequency must be a finite value greater than 0");
+                std::process::exit(2);
+            }
+
+            if taps.is_multiple_of(2) {
+                eprintln!("error: # of taps must be odd");
+                std::process::exit(2);
+            }
+
+            if matches!(*filter_type, FilterType::BandPass | FilterType::Notch) {
+                if !cutoff_high.is_finite() || *cutoff_high <= 0.0 {
+                    eprintln!(
+                        "error: must specify a finite high cutoff frequency > 0.0 for band-pass and notch filters."
+                    );
+                    std::process::exit(2);
+                }
+                if *cutoff_low >= *cutoff_high {
+                    eprintln!(
+                        "error: low cutoff frequency must be strictly less than high cutoff frequency."
+                    );
+                    std::process::exit(2);
+                }
+            }
+
+            eprintln!("filter command invoked!");
+            eprintln!("args:");
+            eprintln!("{:>4}cutoff frequency (low): {:?}", "", cutoff_low);
+
+            if *cutoff_high > 0.0
+                && matches!(*filter_type, FilterType::BandPass | FilterType::Notch)
+            {
+                eprintln!("{:>4}cutoff frequency (high): {:?}", "", cutoff_high);
+            }
+
+            eprintln!("{:>4}sample rate: {:?}", "", sample_rate);
+            eprintln!("{:>4}window function: {}", "", window_function);
+
+            let fc1 = cutoff_low / sample_rate;
+            if fc1 > 0.5 {
+                eprintln!("error: low cutoff frequency is past Nyquist limit");
+                std::process::exit(2);
+            }
+
+            let fc2 = cutoff_high / sample_rate;
+            if fc2 > 0.5 && matches!(*filter_type, FilterType::BandPass | FilterType::Notch) {
+                eprintln!("error: high cutoff frequency is past Nyquist limit");
+                std::process::exit(2);
+            }
+
+            let input = read_from_stdin();
+
+            let computed_taps = match filter_type {
+                FilterType::LowPass => {
+                    filter::generate_low_pass(*taps, fc1, window_function.clone())
+                }
+                FilterType::HighPass => {
+                    filter::generate_high_pass(*taps, fc1, window_function.clone())
+                }
+                FilterType::BandPass => {
+                    filter::generate_band_pass(*taps, fc1, fc2, window_function.clone())
+                }
+                FilterType::Notch => {
+                    filter::generate_notch(*taps, fc1, fc2, window_function.clone())
+                }
+            };
+
+            let output = filter::apply_fir(&input, &computed_taps);
+            write_to_stdout(&output);
         }
     }
 }
