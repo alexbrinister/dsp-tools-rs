@@ -51,8 +51,11 @@ enum Command {
         #[arg(short, long)]
         filter_type: FilterType,
 
-        #[arg(short, long)]
-        cutoff: f64,
+        #[arg(short = 'l', long)]
+        cutoff_low: f64,
+
+        #[arg(short = 'a', long, default_value_t = 0.0)]
+        cutoff_high: f64,
 
         #[arg(short, long)]
         sample_rate: f64,
@@ -60,7 +63,7 @@ enum Command {
         #[arg(short = 'n', long)]
         taps: usize,
 
-        #[arg(short = 'z', long)]
+        #[arg(short = 'z', long, default_value_t = WindowFunction::Blackman)]
         window_function: WindowFunction,
     },
 }
@@ -99,6 +102,8 @@ enum WindowFunction {
 enum FilterType {
     LowPass,
     HighPass,
+    BandPass,
+    Notch,
 }
 
 impl fmt::Display for OutputFormat {
@@ -108,6 +113,18 @@ impl fmt::Display for OutputFormat {
             OutputFormat::Power => "power",
             OutputFormat::Phase => "phase",
             OutputFormat::Complex => "complex",
+        };
+
+        write!(f, "{}", name)
+    }
+}
+
+impl fmt::Display for WindowFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            WindowFunction::Hann => "hann",
+            WindowFunction::Hamming => "hamming",
+            WindowFunction::Blackman => "blackman",
         };
 
         write!(f, "{}", name)
@@ -192,26 +209,52 @@ fn main() {
 
         Command::Filter {
             filter_type,
-            cutoff,
+            cutoff_low,
+            cutoff_high,
             sample_rate,
             taps,
             window_function,
         } => {
+            if matches!(*filter_type, FilterType::BandPass | FilterType::Notch) {
+                if *cutoff_high <= 0.0 {
+                    panic!(
+                        "Must specify a high cutoff frequency > 0.0 for band-pass and notch filters."
+                    );
+                }
+                if *cutoff_low >= *cutoff_high {
+                    panic!(
+                        "Low cutoff frequency must be strictly less than high cutoff frequency."
+                    );
+                }
+            }
+
             eprintln!("filter command invoked!");
             eprintln!("args:");
-            eprintln!("{:>4}cutoff frequency: {:?}", "", cutoff);
+            eprintln!("{:>4}cutoff frequency (low): {:?}", "", cutoff_low);
+
+            if *cutoff_high > 0.0 {
+                eprintln!("{:>4}cutoff frequency (high): {:?}", "", cutoff_high);
+            }
+
             eprintln!("{:>4}sample rate: {:?}", "", sample_rate);
             eprintln!("{:>4}window function: {:?}", "", window_function);
 
-            let fc = (cutoff / sample_rate).min(0.5);
+            let fc1 = (cutoff_low / sample_rate).min(0.5);
+            let fc2 = (cutoff_high / sample_rate).min(0.5);
             let input = read_from_stdin();
 
             let taps = match filter_type {
                 FilterType::LowPass => {
-                    filter::generate_low_pass(*taps, fc, window_function.clone())
+                    filter::generate_low_pass(*taps, fc1, window_function.clone())
                 }
                 FilterType::HighPass => {
-                    filter::generate_high_pass(*taps, fc, window_function.clone())
+                    filter::generate_high_pass(*taps, fc1, window_function.clone())
+                }
+                FilterType::BandPass => {
+                    filter::generate_band_pass(*taps, fc1, fc2, window_function.clone())
+                }
+                FilterType::Notch => {
+                    filter::generate_notch(*taps, fc1, fc2, window_function.clone())
                 }
             };
 

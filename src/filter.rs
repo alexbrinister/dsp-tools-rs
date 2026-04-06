@@ -54,3 +54,33 @@ pub fn generate_high_pass(num_taps: usize, fc: f64, window_function: WindowFunct
     low_pass[center_point] += 1.0;
     low_pass
 }
+
+pub fn generate_band_pass(
+    num_taps: usize,
+    fc1: f64,
+    fc2: f64,
+    window_function: WindowFunction,
+) -> Vec<f64> {
+    let low_pass_fc1: Vec<f64> = generate_low_pass(num_taps, fc1, window_function.clone());
+    let low_pass_fc2: Vec<f64> = generate_low_pass(num_taps, fc2, window_function.clone());
+    low_pass_fc2
+        .iter()
+        .zip(low_pass_fc1.iter())
+        .map(|(high, low)| high - low)
+        .collect()
+}
+
+pub fn generate_notch(
+    num_taps: usize,
+    fc1: f64,
+    fc2: f64,
+    window_function: WindowFunction,
+) -> Vec<f64> {
+    let low_pass: Vec<f64> = generate_low_pass(num_taps, fc1, window_function.clone());
+    let high_pass: Vec<f64> = generate_high_pass(num_taps, fc2, window_function.clone());
+    high_pass
+        .iter()
+        .zip(low_pass.iter())
+        .map(|(high, low)| high + low)
+        .collect()
+}
