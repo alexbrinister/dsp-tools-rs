@@ -263,14 +263,14 @@ fn main() {
             }
 
             let fc2 = cutoff_high / sample_rate;
-            if fc2 > 0.5 {
+            if fc2 > 0.5 && matches!(*filter_type, FilterType::BandPass | FilterType::Notch) {
                 eprintln!("error: high cutoff frequency is past Nyquist limit");
                 std::process::exit(2);
             }
 
             let input = read_from_stdin();
 
-            let taps = match filter_type {
+            let num_taps = match filter_type {
                 FilterType::LowPass => {
                     filter::generate_low_pass(*taps, fc1, window_function.clone())
                 }
@@ -285,7 +285,7 @@ fn main() {
                 }
             };
 
-            let output = filter::apply_fir(&input, &taps);
+            let output = filter::apply_fir(&input, &num_taps);
             write_to_stdout(&output);
         }
     }

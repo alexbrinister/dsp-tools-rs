@@ -2,6 +2,8 @@ use crate::WindowFunction;
 use crate::window;
 
 pub fn apply_fir(input: &[f64], taps: &[f64]) -> Vec<f64> {
+    assert!(!taps.is_empty(), "taps array must not be empty");
+
     (0..input.len())
         .map(|n| {
             let k_max = n.min(taps.len() - 1);
@@ -11,6 +13,8 @@ pub fn apply_fir(input: &[f64], taps: &[f64]) -> Vec<f64> {
 }
 
 pub fn generate_low_pass(num_taps: usize, fc: f64, window_function: WindowFunction) -> Vec<f64> {
+    assert!(num_taps > 0, "number of taps must be greater than 0");
+
     let center_point = (num_taps - 1) / 2;
     let center_point_f64 = center_point as f64;
 
