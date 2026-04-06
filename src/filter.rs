@@ -14,6 +14,11 @@ pub fn apply_fir(input: &[f64], taps: &[f64]) -> Vec<f64> {
 
 pub fn generate_low_pass(num_taps: usize, fc: f64, window_function: WindowFunction) -> Vec<f64> {
     assert!(num_taps > 0, "number of taps must be greater than 0");
+    assert!(fc.is_finite(), "cutoff frequency must be finite");
+    assert!(
+        (0.0..=0.5).contains(&fc),
+        "cutoff frequency must be within the normalized range 0.0..=0.5"
+    );
 
     let center_point = (num_taps - 1) / 2;
     let center_point_f64 = center_point as f64;
