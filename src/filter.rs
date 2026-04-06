@@ -11,16 +11,10 @@ pub fn apply_fir(input: &[f64], taps: &[f64]) -> Vec<f64> {
 }
 
 pub fn generate_low_pass(num_taps: usize, fc: f64, window_function: WindowFunction) -> Vec<f64> {
-    let adjusted_num_taps = if num_taps.is_multiple_of(2) {
-        num_taps + 1
-    } else {
-        num_taps
-    };
-
-    let center_point = (adjusted_num_taps - 1) / 2;
+    let center_point = (num_taps - 1) / 2;
     let center_point_f64 = center_point as f64;
 
-    let mut output: Vec<f64> = (0..adjusted_num_taps)
+    let mut output: Vec<f64> = (0..num_taps)
         .map(|i| {
             let i_f64 = i as f64;
 

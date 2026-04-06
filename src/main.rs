@@ -194,7 +194,7 @@ fn main() {
         Command::Window { window_function } => {
             eprintln!("window command invoked!");
             eprintln!("args:");
-            eprintln!("{:>4}window function: {:?}", "", window_function);
+            eprintln!("{:>4}window function: {}", "", window_function);
 
             let mut data = read_from_stdin();
 
@@ -215,6 +215,21 @@ fn main() {
             taps,
             window_function,
         } => {
+            if *sample_rate <= 0.0 {
+                eprintln!("error: sample rate must be greater than 0");
+                std::process::exit(2);
+            }
+
+            if *cutoff_low <= 0.0 {
+                eprintln!("error: low cutoff frequency must be greater than 0");
+                std::process::exit(2);
+            }
+
+            if taps.is_multiple_of(2) {
+                eprintln!("error: # of taps must be odd");
+                std::process::exit(2);
+            }
+
             if matches!(*filter_type, FilterType::BandPass | FilterType::Notch) {
                 if *cutoff_high <= 0.0 {
                     eprintln!(
@@ -239,10 +254,20 @@ fn main() {
             }
 
             eprintln!("{:>4}sample rate: {:?}", "", sample_rate);
-            eprintln!("{:>4}window function: {:?}", "", window_function);
+            eprintln!("{:>4}window function: {}", "", window_function);
 
-            let fc1 = (cutoff_low / sample_rate).min(0.5);
-            let fc2 = (cutoff_high / sample_rate).min(0.5);
+            let fc1 = cutoff_low / sample_rate;
+            if fc1 > 0.5 {
+                eprintln!("error: low cutoff frequency is past Nyquist limit");
+                std::process::exit(2);
+            }
+
+            let fc2 = cutoff_high / sample_rate;
+            if fc2 > 0.5 {
+                eprintln!("error: high cutoff frequency is past Nyquist limit");
+                std::process::exit(2);
+            }
+
             let input = read_from_stdin();
 
             let taps = match filter_type {
