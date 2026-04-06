@@ -215,8 +215,8 @@ fn main() {
             taps,
             window_function,
         } => {
-            if *sample_rate <= 0.0 {
-                eprintln!("error: sample rate must be greater than 0");
+            if !sample_rate.is_finite() || *sample_rate <= 0.0 {
+                eprintln!("error: sample rate must be a finite value greater than 0");
                 std::process::exit(2);
             }
 
