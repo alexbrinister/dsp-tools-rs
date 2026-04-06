@@ -217,14 +217,16 @@ fn main() {
         } => {
             if matches!(*filter_type, FilterType::BandPass | FilterType::Notch) {
                 if *cutoff_high <= 0.0 {
-                    panic!(
-                        "Must specify a high cutoff frequency > 0.0 for band-pass and notch filters."
+                    eprintln!(
+                        "error: must specify a high cutoff frequency > 0.0 for band-pass and notch filters."
                     );
+                    std::process::exit(2);
                 }
                 if *cutoff_low >= *cutoff_high {
-                    panic!(
-                        "Low cutoff frequency must be strictly less than high cutoff frequency."
+                    eprintln!(
+                        "error: low cutoff frequency must be strictly less than high cutoff frequency."
                     );
+                    std::process::exit(2);
                 }
             }
 
