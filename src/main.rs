@@ -166,6 +166,13 @@ impl fmt::Display for WindowFunction {
 }
 
 fn main() {
+    if let Err(e) = run() {
+        eprintln!("error: {}", e);
+        std::process::exit(2);
+    }
+}
+
+fn run() -> Result<(), String> {
     let cli = Cli::parse();
 
     match &cli.command {
@@ -251,62 +258,26 @@ fn main() {
 
             let computed_taps = match filter_type {
                 FilterCommand::LowPass(args) => {
-                    let fc =
-                        try_get_frequency_ratio(args.cutoff, *sample_rate).unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-
+                    let fc = try_get_frequency_ratio(args.cutoff, *sample_rate)?;
                     filter::generate_low_pass(*taps, fc, window_function.clone())
                 }
 
                 FilterCommand::HighPass(args) => {
-                    let fc =
-                        try_get_frequency_ratio(args.cutoff, *sample_rate).unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-
+                    let fc = try_get_frequency_ratio(args.cutoff, *sample_rate)?;
                     filter::generate_high_pass(*taps, fc, window_function.clone())
                 }
 
                 FilterCommand::BandPass(args) => {
-                    if let Err(e) = args.validate() {
-                        eprintln!("{}", e);
-                        std::process::exit(2);
-                    }
-
-                    let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)
-                        .unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-                    let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)
-                        .unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-
+                    args.validate()?;
+                    let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)?;
+                    let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)?;
                     filter::generate_band_pass(*taps, fc1, fc2, window_function.clone())
                 }
 
                 FilterCommand::Notch(args) => {
-                    if let Err(e) = args.validate() {
-                        eprintln!("{}", e);
-                        std::process::exit(2);
-                    }
-
-                    let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)
-                        .unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-                    let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)
-                        .unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-
+                    args.validate()?;
+                    let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)?;
+                    let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)?;
                     filter::generate_notch(*taps, fc1, fc2, window_function.clone())
                 }
 
@@ -334,6 +305,8 @@ fn main() {
             write_to_stdout(&output);
         }
     }
+
+    Ok(())
 }
 
 fn parse_finite_gt0_f64(arg: &str) -> Result<f64, String> {
