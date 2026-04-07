@@ -104,6 +104,7 @@ enum FilterType {
     HighPass,
     BandPass,
     Notch,
+    Derivative,
 }
 
 impl fmt::Display for OutputFormat {
@@ -285,6 +286,7 @@ fn main() {
                 FilterType::Notch => {
                     filter::generate_notch(*taps, fc1, fc2, window_function.clone())
                 }
+                FilterType::Derivative => vec![0.5, 0.0, -0.5],
             };
 
             let output = filter::apply_fir(&input, &computed_taps);
