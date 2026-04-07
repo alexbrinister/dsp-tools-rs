@@ -286,18 +286,12 @@ fn run() -> Result<(), String> {
                 FilterCommand::Matched { template_file } => {
                     let template_path = Path::new(&template_file);
 
-                    match File::open(template_path) {
-                        Ok(file) => {
-                            let mut template_taps = read_f64_stream(file);
-                            template_taps.reverse();
-                            template_taps
-                        }
+                    let file = File::open(template_path)
+                        .map_err(|e| format!("error: cannot access template file: '{}'", e))?;
 
-                        Err(error) => {
-                            eprintln!("error: cannot access template file: '{}'", error);
-                            std::process::exit(2);
-                        }
-                    }
+                    let mut template_taps = read_f64_stream(file);
+                    template_taps.reverse();
+                    template_taps
                 }
             };
 
