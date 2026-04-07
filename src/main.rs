@@ -2,7 +2,9 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use clap::{Parser, Subcommand, ValueEnum};
 use num_complex::Complex;
 use std::fmt;
-use std::io::Write;
+use std::fs::File;
+use std::io::{BufReader, Read, Write};
+use std::path::Path;
 
 mod filter;
 mod ft;
@@ -65,6 +67,9 @@ enum Command {
 
         #[arg(short = 'z', long, default_value_t = WindowFunction::Blackman)]
         window_function: WindowFunction,
+
+        #[arg(long, default_value = "")]
+        template_file: String,
     },
 }
 
@@ -105,6 +110,7 @@ enum FilterType {
     BandPass,
     Notch,
     Derivative,
+    Matched,
 }
 
 impl fmt::Display for OutputFormat {
@@ -215,6 +221,7 @@ fn main() {
             sample_rate,
             taps,
             window_function,
+            template_file,
         } => {
             if !sample_rate.is_finite() || *sample_rate <= 0.0 {
                 eprintln!("error: sample rate must be a finite value greater than 0");
@@ -244,6 +251,11 @@ fn main() {
                     );
                     std::process::exit(2);
                 }
+            }
+
+            if matches!(*filter_type, FilterType::Matched) && template_file.is_empty() {
+                eprintln!("error: template file path cannot be empty");
+                std::process::exit(2);
             }
 
             eprintln!("filter command invoked!");
@@ -287,6 +299,22 @@ fn main() {
                     filter::generate_notch(*taps, fc1, fc2, window_function.clone())
                 }
                 FilterType::Derivative => vec![0.5, 0.0, -0.5],
+                FilterType::Matched => {
+                    let template_path = Path::new(&template_file);
+
+                    match File::open(template_path) {
+                        Ok(file) => {
+                            let mut template_taps = read_f64_stream(file);
+                            template_taps.reverse();
+                            template_taps
+                        }
+
+                        Err(error) => {
+                            eprintln!("error: cannot access template file: '{}'", error);
+                            std::process::exit(2);
+                        }
+                    }
+                }
             };
 
             let output = filter::apply_fir(&input, &computed_taps);
@@ -308,28 +336,32 @@ fn write_to_stdout(data: &[f64]) {
 }
 
 fn read_from_stdin() -> Vec<f64> {
+    let stdin = std::io::stdin().lock();
+    read_f64_stream(stdin)
+}
+
+fn read_f64_stream<R: Read>(reader: R) -> Vec<f64> {
     // take in no more than 65536 values
     const UPPER_INPUT_BOUND: usize = 1 << 16;
     let mut data = Vec::with_capacity(UPPER_INPUT_BOUND);
-    let mut stdin = std::io::stdin().lock();
+
+    let mut buffered_reader = BufReader::new(reader);
     let mut count: usize = 0;
 
     while count < UPPER_INPUT_BOUND {
-        let result = stdin.read_f64::<LittleEndian>();
+        match buffered_reader.read_f64::<LittleEndian>() {
+            // if we get a good result, add it to the output vector
+            Ok(val) => {
+                data.push(val);
+                count += 1;
+            }
 
-        match result {
             // if we get EOF, then leave the loop
             // if any other error, we panic
             Err(error) => match error.kind() {
                 std::io::ErrorKind::UnexpectedEof => break,
-                _ => panic!("Couldn't read from stdin"),
+                _ => panic!("I/O error reading stream: {}", error),
             },
-
-            // if we get a good result, add it to the output vector
-            Ok(result) => {
-                data.push(result);
-                count += 1;
-            }
         }
     }
 
