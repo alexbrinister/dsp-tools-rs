@@ -213,15 +213,11 @@ fn run() -> Result<(), anyhow::Error> {
             transform_type,
             output_format,
         } => {
-            let mut data = read_from_stdin()?;
+            let data = read_from_stdin()?;
 
             let out = match transform_type {
                 TransformType::Dft => ft::dft(&data),
-                TransformType::Fft => {
-                    // Guard against non-power-of-two inputs by zero-padding the data
-                    pad_to_pow2(&mut data);
-                    ft::fft(&data)
-                }
+                TransformType::Fft => ft::fft(&data),
             };
 
             let formatted_out = format_output(&out, output_format.clone());
@@ -386,17 +382,6 @@ fn format_output(complex_data: &[Complex<f64>], output_format: OutputFormat) -> 
     }
 }
 
-fn pad_to_pow2(data: &mut Vec<f64>) {
-    let n: usize = data.len();
-
-    // not a power of two
-    // find new size (next power of two) and resize data in-place
-    if n > 0 && !n.is_power_of_two() {
-        let new_byte_count = n.next_power_of_two();
-        data.resize(new_byte_count, 0.0);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -540,46 +525,6 @@ mod tests {
         assert!(approx_eq(out[3], 4.0, EPSILON));
     }
 
-    // --- pad_to_pow2 ---
-
-    #[test]
-    fn pad_to_pow2_already_power_of_two() {
-        let mut data = vec![1.0f64; 8];
-        pad_to_pow2(&mut data);
-        assert_eq!(data.len(), 8);
-    }
-
-    #[test]
-    fn pad_to_pow2_not_power_of_two() {
-        let mut data = vec![1.0f64; 5];
-        pad_to_pow2(&mut data);
-        assert_eq!(data.len(), 8);
-    }
-
-    #[test]
-    fn pad_to_pow2_padding_is_zeros() {
-        let mut data = vec![1.0f64; 5];
-        pad_to_pow2(&mut data);
-        for &val in &data[5..] {
-            assert!(approx_eq(val, 0.0, EPSILON));
-        }
-    }
-
-    #[test]
-    fn pad_to_pow2_empty() {
-        let mut data: Vec<f64> = vec![];
-        pad_to_pow2(&mut data);
-        assert!(data.is_empty());
-    }
-
-    #[test]
-    fn pad_to_pow2_single_element() {
-        let mut data = vec![42.0f64];
-        pad_to_pow2(&mut data);
-        assert_eq!(data.len(), 1);
-        assert!(approx_eq(data[0], 42.0, EPSILON));
-    }
-
     // --- read_f64_stream ---
 
     fn make_le_f64_bytes(values: &[f64]) -> Vec<u8> {
@@ -622,19 +567,28 @@ mod tests {
 
     #[test]
     fn dual_cutoff_validate_valid() {
-        let dc = DualCutoff { cutoff_low: 0.1, cutoff_high: 0.3 };
+        let dc = DualCutoff {
+            cutoff_low: 0.1,
+            cutoff_high: 0.3,
+        };
         assert!(dc.validate().is_ok());
     }
 
     #[test]
     fn dual_cutoff_validate_equal() {
-        let dc = DualCutoff { cutoff_low: 0.2, cutoff_high: 0.2 };
+        let dc = DualCutoff {
+            cutoff_low: 0.2,
+            cutoff_high: 0.2,
+        };
         assert!(dc.validate().is_err());
     }
 
     #[test]
     fn dual_cutoff_validate_reversed() {
-        let dc = DualCutoff { cutoff_low: 0.4, cutoff_high: 0.1 };
+        let dc = DualCutoff {
+            cutoff_low: 0.4,
+            cutoff_high: 0.1,
+        };
         assert!(dc.validate().is_err());
     }
 }
