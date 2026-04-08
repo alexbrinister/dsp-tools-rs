@@ -78,3 +78,119 @@ pub fn fft(input: &[f64]) -> Vec<Complex<f64>> {
 
     output
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const EPSILON: f64 = 1e-10;
+
+    fn approx_eq(a: f64, b: f64, eps: f64) -> bool {
+        (a - b).abs() < eps
+    }
+
+    // --- DFT tests ---
+
+    #[test]
+    fn dft_output_length() {
+        let input = vec![1.0, 0.0, -1.0, 0.0, 1.0];
+        let output = dft(&input);
+        assert_eq!(output.len(), input.len());
+    }
+
+    #[test]
+    fn dft_zero_input() {
+        let input = vec![0.0f64; 8];
+        let output = dft(&input);
+        for bin in &output {
+            assert!(approx_eq(bin.re, 0.0, EPSILON));
+            assert!(approx_eq(bin.im, 0.0, EPSILON));
+        }
+    }
+
+    #[test]
+    fn dft_dc_input() {
+        // Constant input of 1.0: bin 0 should equal N, all others 0
+        let n = 8;
+        let input = vec![1.0f64; n];
+        let output = dft(&input);
+        assert!(approx_eq(output[0].re, n as f64, EPSILON));
+        assert!(approx_eq(output[0].im, 0.0, EPSILON));
+        for bin in &output[1..] {
+            assert!(approx_eq(bin.re, 0.0, EPSILON));
+            assert!(approx_eq(bin.im, 0.0, EPSILON));
+        }
+    }
+
+    #[test]
+    fn dft_single_freq() {
+        // A pure cosine at frequency k=1 over N=8 samples should produce
+        // magnitude N/2 at bins 1 and N-1, and ~0 elsewhere.
+        let n = 8usize;
+        let input: Vec<f64> = (0..n)
+            .map(|i| (2.0 * std::f64::consts::PI * i as f64 / n as f64).cos())
+            .collect();
+        let output = dft(&input);
+        let half = (n / 2) as f64;
+        assert!(approx_eq(output[1].norm(), half, 1e-10));
+        assert!(approx_eq(output[n - 1].norm(), half, 1e-10));
+        // All other bins should be near zero
+        for k in 2..(n - 1) {
+            assert!(approx_eq(output[k].norm(), 0.0, 1e-10));
+        }
+    }
+
+    // --- FFT tests ---
+
+    #[test]
+    fn fft_zero_input() {
+        let input = vec![0.0f64; 8];
+        let output = fft(&input);
+        for bin in &output {
+            assert!(approx_eq(bin.re, 0.0, EPSILON));
+            assert!(approx_eq(bin.im, 0.0, EPSILON));
+        }
+    }
+
+    #[test]
+    fn fft_dc_input() {
+        let n = 8;
+        let input = vec![1.0f64; n];
+        let output = fft(&input);
+        assert!(approx_eq(output[0].re, n as f64, EPSILON));
+        assert!(approx_eq(output[0].im, 0.0, EPSILON));
+        for bin in &output[1..] {
+            assert!(approx_eq(bin.norm(), 0.0, EPSILON));
+        }
+    }
+
+    #[test]
+    fn fft_matches_dft() {
+        // For any power-of-2 input the FFT must produce the same result as the DFT.
+        let input: Vec<f64> = (0..16)
+            .map(|i| (2.0 * std::f64::consts::PI * 3.0 * i as f64 / 16.0).sin())
+            .collect();
+        let dft_out = dft(&input);
+        let fft_out = fft(&input);
+        assert_eq!(dft_out.len(), fft_out.len());
+        for (d, f) in dft_out.iter().zip(fft_out.iter()) {
+            assert!(approx_eq(d.re, f.re, 1e-9), "re mismatch: {} vs {}", d.re, f.re);
+            assert!(approx_eq(d.im, f.im, 1e-9), "im mismatch: {} vs {}", d.im, f.im);
+        }
+    }
+
+    #[test]
+    fn fft_single_freq() {
+        let n = 8usize;
+        let input: Vec<f64> = (0..n)
+            .map(|i| (2.0 * std::f64::consts::PI * i as f64 / n as f64).cos())
+            .collect();
+        let output = fft(&input);
+        let half = (n / 2) as f64;
+        assert!(approx_eq(output[1].norm(), half, 1e-10));
+        assert!(approx_eq(output[n - 1].norm(), half, 1e-10));
+        for k in 2..(n - 1) {
+            assert!(approx_eq(output[k].norm(), 0.0, 1e-10));
+        }
+    }
+}
