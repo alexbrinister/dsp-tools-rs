@@ -152,6 +152,7 @@ dependencies = [
 name = "dsp-tools"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "byteorder",
  "clap",
  "num-complex",

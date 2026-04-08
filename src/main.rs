@@ -1,3 +1,4 @@
+use anyhow::{Context, anyhow};
 use byteorder::{LittleEndian, ReadBytesExt};
 use clap::{Parser, Subcommand, ValueEnum};
 use num_complex::Complex;
@@ -80,12 +81,12 @@ pub struct DualCutoff {
 }
 
 impl DualCutoff {
-    fn validate(&self) -> Result<(), String> {
+    fn validate(&self) -> Result<(), anyhow::Error> {
         if self.cutoff_low >= self.cutoff_high {
-            return Err(
+            return Err(anyhow!(
                 "low cutoff frequency must be strictly less than high cutoff frequency."
-                    .to_string(),
-            );
+                    .to_string()
+            ));
         }
 
         Ok(())
@@ -172,7 +173,7 @@ fn main() {
     }
 }
 
-fn run() -> Result<(), String> {
+fn run() -> Result<(), anyhow::Error> {
     let cli = Cli::parse();
 
     match &cli.command {
@@ -286,8 +287,7 @@ fn run() -> Result<(), String> {
                 FilterCommand::Matched { template_file } => {
                     let template_path = Path::new(&template_file);
 
-                    let file = File::open(template_path)
-                        .map_err(|e| format!("error: cannot access template file: '{}'", e))?;
+                    let file = File::open(template_path).context("cannot access template file")?;
 
                     let mut template_taps = read_f64_stream(file)?;
                     template_taps.reverse();
@@ -303,32 +303,32 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
-fn parse_finite_gt0_f64(arg: &str) -> Result<f64, String> {
+fn parse_finite_gt0_f64(arg: &str) -> Result<f64, anyhow::Error> {
     let val: f64 = arg
         .parse()
-        .map_err(|_| "value must be a valid number".to_string())?;
+        .context("value must be a valid number".to_string())?;
     if val.is_finite() && val > 0.0 {
         return Ok(val);
     }
 
-    Err("value out of range 0.0 < x < NaN".to_string())
+    Err(anyhow!("value out of range 0.0 < x < NaN".to_string()))
 }
 
-fn parse_gt0_odd(arg: &str) -> Result<usize, String> {
+fn parse_gt0_odd(arg: &str) -> Result<usize, anyhow::Error> {
     let val: usize = arg
         .parse()
-        .map_err(|_| "value must be a valid integer".to_string())?;
+        .context("value must be a valid integer".to_string())?;
     if val % 2 == 0 {
-        return Err("value must be odd".to_string());
+        return Err(anyhow!("value must be odd".to_string()));
     }
 
     Ok(val)
 }
 
-fn try_get_frequency_ratio(cutoff: f64, sample_rate: f64) -> Result<f64, String> {
+fn try_get_frequency_ratio(cutoff: f64, sample_rate: f64) -> Result<f64, anyhow::Error> {
     let fc = cutoff / sample_rate;
     if fc > 0.5 {
-        return Err(format!(
+        return Err(anyhow!(
             "error: cutoff frequency {0} is past Nyquist limit",
             cutoff
         ));
@@ -337,7 +337,7 @@ fn try_get_frequency_ratio(cutoff: f64, sample_rate: f64) -> Result<f64, String>
     Ok(fc)
 }
 
-fn write_to_stdout(data: &[f64]) -> Result<(), String> {
+fn write_to_stdout(data: &[f64]) -> Result<(), anyhow::Error> {
     let mut stdout = std::io::stdout().lock();
 
     for val in data {
@@ -346,21 +346,19 @@ fn write_to_stdout(data: &[f64]) -> Result<(), String> {
                 return Ok(());
             }
 
-            return Err(format!("Failed to write wave to stdout: {}", e));
+            return Err(anyhow!("Failed to write wave to stdout"));
         }
     }
 
-    stdout
-        .flush()
-        .map_err(|e| format!("Failed to flush stdout: {}", e))
+    stdout.flush().context("Failed to flush stdout")
 }
 
-fn read_from_stdin() -> Result<Vec<f64>, String> {
+fn read_from_stdin() -> Result<Vec<f64>, anyhow::Error> {
     let stdin = std::io::stdin().lock();
     read_f64_stream(stdin)
 }
 
-fn read_f64_stream<R: Read>(reader: R) -> Result<Vec<f64>, String> {
+fn read_f64_stream<R: Read>(reader: R) -> Result<Vec<f64>, anyhow::Error> {
     // take in no more than 65536 values
     const UPPER_INPUT_BOUND: usize = 1 << 16;
     let mut data = Vec::with_capacity(UPPER_INPUT_BOUND);
@@ -380,7 +378,7 @@ fn read_f64_stream<R: Read>(reader: R) -> Result<Vec<f64>, String> {
             // if any other error, we panic
             Err(error) => match error.kind() {
                 std::io::ErrorKind::UnexpectedEof => break,
-                _ => return Err(format!("I/O error reading stream: {}", error)),
+                _ => return Err(anyhow!("I/O error reading stream")),
             },
         }
     }
