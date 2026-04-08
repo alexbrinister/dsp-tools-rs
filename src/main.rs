@@ -7,10 +7,7 @@ use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use std::path::Path;
 
-mod filter;
-mod ft;
-mod signal;
-mod window;
+use dsp_tools::{filter, ft, signal, window};
 
 #[derive(Parser)]
 #[command(name = "DSP CLI")]
@@ -47,7 +44,7 @@ enum Command {
 
     Window {
         #[arg(short = 'z', long)]
-        window_function: WindowFunction,
+        window_function: CliWindowFunction,
     },
 
     Filter {
@@ -57,8 +54,8 @@ enum Command {
         #[arg(short = 'n', long, value_parser = parse_gt0_odd)]
         taps: usize,
 
-        #[arg(short = 'z', long, default_value_t = WindowFunction::Blackman)]
-        window_function: WindowFunction,
+        #[arg(short = 'z', long, default_value_t = CliWindowFunction::Blackman)]
+        window_function: CliWindowFunction,
 
         #[command(subcommand)]
         filter_type: FilterCommand,
@@ -135,7 +132,7 @@ enum OutputFormat {
 }
 
 #[derive(ValueEnum, Clone, Debug)]
-enum WindowFunction {
+pub enum CliWindowFunction {
     Hann,
     Hamming,
     Blackman,
@@ -154,15 +151,25 @@ impl fmt::Display for OutputFormat {
     }
 }
 
-impl fmt::Display for WindowFunction {
+impl fmt::Display for CliWindowFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
-            WindowFunction::Hann => "hann",
-            WindowFunction::Hamming => "hamming",
-            WindowFunction::Blackman => "blackman",
+            CliWindowFunction::Hann => "hann",
+            CliWindowFunction::Hamming => "hamming",
+            CliWindowFunction::Blackman => "blackman",
         };
 
         write!(f, "{}", name)
+    }
+}
+
+impl From<CliWindowFunction> for window::WindowFunction {
+    fn from(cli_enum: CliWindowFunction) -> Self {
+        match cli_enum {
+            CliWindowFunction::Hann => window::WindowFunction::Hann,
+            CliWindowFunction::Hamming => window::WindowFunction::Hamming,
+            CliWindowFunction::Blackman => window::WindowFunction::Blackman,
+        }
     }
 }
 
@@ -241,9 +248,9 @@ fn run() -> Result<(), anyhow::Error> {
             let mut data = read_from_stdin()?;
 
             match window_function {
-                WindowFunction::Hann => window::apply_hann(&mut data),
-                WindowFunction::Hamming => window::apply_hamming(&mut data),
-                WindowFunction::Blackman => window::apply_blackman(&mut data),
+                CliWindowFunction::Hann => window::apply_hann(&mut data),
+                CliWindowFunction::Hamming => window::apply_hamming(&mut data),
+                CliWindowFunction::Blackman => window::apply_blackman(&mut data),
             };
 
             write_to_stdout(&data)?;
@@ -260,26 +267,26 @@ fn run() -> Result<(), anyhow::Error> {
             let computed_taps = match filter_type {
                 FilterCommand::LowPass(args) => {
                     let fc = try_get_frequency_ratio(args.cutoff, *sample_rate)?;
-                    filter::generate_low_pass(*taps, fc, window_function.clone())?
+                    filter::generate_low_pass(*taps, fc, window_function.clone().into())?
                 }
 
                 FilterCommand::HighPass(args) => {
                     let fc = try_get_frequency_ratio(args.cutoff, *sample_rate)?;
-                    filter::generate_high_pass(*taps, fc, window_function.clone())?
+                    filter::generate_high_pass(*taps, fc, window_function.clone().into())?
                 }
 
                 FilterCommand::BandPass(args) => {
                     args.validate()?;
                     let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)?;
                     let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)?;
-                    filter::generate_band_pass(*taps, fc1, fc2, window_function.clone())?
+                    filter::generate_band_pass(*taps, fc1, fc2, window_function.clone().into())?
                 }
 
                 FilterCommand::Notch(args) => {
                     args.validate()?;
                     let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)?;
                     let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)?;
-                    filter::generate_notch(*taps, fc1, fc2, window_function.clone())?
+                    filter::generate_notch(*taps, fc1, fc2, window_function.clone().into())?
                 }
 
                 FilterCommand::Derivative => vec![0.5, 0.0, -0.5],

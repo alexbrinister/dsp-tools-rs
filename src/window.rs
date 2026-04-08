@@ -1,3 +1,10 @@
+#[derive(Clone, Debug, PartialEq)]
+pub enum WindowFunction {
+    Hann,
+    Hamming,
+    Blackman,
+}
+
 pub fn apply_hann(data: &mut [f64]) {
     if data.len() <= 1 {
         return;

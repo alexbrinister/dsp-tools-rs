@@ -1,5 +1,5 @@
-use crate::WindowFunction;
 use crate::window;
+use crate::window::WindowFunction;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
