@@ -190,13 +190,6 @@ fn run() -> Result<(), anyhow::Error> {
             frequency,
             duration,
         } => {
-            eprintln!("signal command invoked!");
-            eprintln!("args:");
-            eprintln!("{:>4}function: {:?}", "", function);
-            eprintln!("{:>4}sample rate: {:?}", "", sample_rate);
-            eprintln!("{:>4}frequency: {:?}", "", frequency);
-            eprintln!("{:>4}duration: {:?}", "", duration);
-
             let out = match function {
                 SignalFunction::Sine => signal::generate_sine(*frequency, *duration, *sample_rate),
 
@@ -220,11 +213,6 @@ fn run() -> Result<(), anyhow::Error> {
             transform_type,
             output_format,
         } => {
-            eprintln!("ft command invoked!");
-            eprintln!("args:");
-            eprintln!("{:>4}transform type: {:?}", "", transform_type);
-            eprintln!("{:>4}output format: {:?}", "", output_format);
-
             let mut data = read_from_stdin()?;
 
             let out = match transform_type {
@@ -241,10 +229,6 @@ fn run() -> Result<(), anyhow::Error> {
         }
 
         Command::Window { window_function } => {
-            eprintln!("window command invoked!");
-            eprintln!("args:");
-            eprintln!("{:>4}window function: {}", "", window_function);
-
             let mut data = read_from_stdin()?;
 
             match window_function {
