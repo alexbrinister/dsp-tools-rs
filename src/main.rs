@@ -205,7 +205,7 @@ fn run() -> Result<(), String> {
                 SignalFunction::NoiseG => signal::generate_gaussian_noise(*duration, *sample_rate),
             };
 
-            write_to_stdout(&out);
+            write_to_stdout(&out)?;
         }
 
         Command::Ft {
@@ -217,7 +217,7 @@ fn run() -> Result<(), String> {
             eprintln!("{:>4}transform type: {:?}", "", transform_type);
             eprintln!("{:>4}output format: {:?}", "", output_format);
 
-            let mut data = read_from_stdin();
+            let mut data = read_from_stdin()?;
 
             let out = match transform_type {
                 TransformType::Dft => ft::dft(&data),
@@ -229,7 +229,7 @@ fn run() -> Result<(), String> {
             };
 
             let formatted_out = format_output(&out, output_format.clone());
-            write_to_stdout(&formatted_out);
+            write_to_stdout(&formatted_out)?;
         }
 
         Command::Window { window_function } => {
@@ -237,7 +237,7 @@ fn run() -> Result<(), String> {
             eprintln!("args:");
             eprintln!("{:>4}window function: {}", "", window_function);
 
-            let mut data = read_from_stdin();
+            let mut data = read_from_stdin()?;
 
             match window_function {
                 WindowFunction::Hann => window::apply_hann(&mut data),
@@ -245,7 +245,7 @@ fn run() -> Result<(), String> {
                 WindowFunction::Blackman => window::apply_blackman(&mut data),
             };
 
-            write_to_stdout(&data);
+            write_to_stdout(&data)?;
         }
 
         Command::Filter {
@@ -254,7 +254,7 @@ fn run() -> Result<(), String> {
             window_function,
             filter_type,
         } => {
-            let input = read_from_stdin();
+            let input = read_from_stdin()?;
 
             let computed_taps = match filter_type {
                 FilterCommand::LowPass(args) => {
@@ -289,14 +289,14 @@ fn run() -> Result<(), String> {
                     let file = File::open(template_path)
                         .map_err(|e| format!("error: cannot access template file: '{}'", e))?;
 
-                    let mut template_taps = read_f64_stream(file);
+                    let mut template_taps = read_f64_stream(file)?;
                     template_taps.reverse();
                     template_taps
                 }
             };
 
             let output = filter::apply_fir(&input, &computed_taps);
-            write_to_stdout(&output);
+            write_to_stdout(&output)?;
         }
     }
 
@@ -337,24 +337,30 @@ fn try_get_frequency_ratio(cutoff: f64, sample_rate: f64) -> Result<f64, String>
     Ok(fc)
 }
 
-fn write_to_stdout(data: &[f64]) {
+fn write_to_stdout(data: &[f64]) -> Result<(), String> {
     let mut stdout = std::io::stdout().lock();
 
     for val in data {
-        stdout
-            .write_all(&val.to_le_bytes())
-            .expect("Failed to write wave to stdout");
+        if let Err(e) = stdout.write_all(&val.to_le_bytes()) {
+            if e.kind() == std::io::ErrorKind::BrokenPipe {
+                return Ok(());
+            }
+
+            return Err(format!("Failed to write wave to stdout: {}", e));
+        }
     }
 
-    stdout.flush().expect("Failed to flush stdout");
+    stdout
+        .flush()
+        .map_err(|e| format!("Failed to flush stdout: {}", e))
 }
 
-fn read_from_stdin() -> Vec<f64> {
+fn read_from_stdin() -> Result<Vec<f64>, String> {
     let stdin = std::io::stdin().lock();
     read_f64_stream(stdin)
 }
 
-fn read_f64_stream<R: Read>(reader: R) -> Vec<f64> {
+fn read_f64_stream<R: Read>(reader: R) -> Result<Vec<f64>, String> {
     // take in no more than 65536 values
     const UPPER_INPUT_BOUND: usize = 1 << 16;
     let mut data = Vec::with_capacity(UPPER_INPUT_BOUND);
@@ -374,12 +380,12 @@ fn read_f64_stream<R: Read>(reader: R) -> Vec<f64> {
             // if any other error, we panic
             Err(error) => match error.kind() {
                 std::io::ErrorKind::UnexpectedEof => break,
-                _ => panic!("I/O error reading stream: {}", error),
+                _ => return Err(format!("I/O error reading stream: {}", error)),
             },
         }
     }
 
-    data
+    Ok(data)
 }
 
 fn format_output(complex_data: &[Complex<f64>], output_format: OutputFormat) -> Vec<f64> {
