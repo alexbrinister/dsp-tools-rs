@@ -324,20 +324,22 @@ fn try_get_frequency_ratio(cutoff: f64, sample_rate: f64) -> Result<f64, anyhow:
     Ok(fc)
 }
 
-fn write_to_stdout(data: &[f64]) -> Result<(), anyhow::Error> {
-    let mut stdout = std::io::stdout().lock();
-
+fn write_to_stream<W: Write>(mut writer: W, data: &[f64]) -> Result<(), anyhow::Error> {
     for val in data {
-        if let Err(e) = stdout.write_all(&val.to_le_bytes()) {
+        if let Err(e) = writer.write_all(&val.to_le_bytes()) {
             if e.kind() == std::io::ErrorKind::BrokenPipe {
                 return Ok(());
             }
 
-            return Err(anyhow!("Failed to write wave to stdout"));
+            return Err(anyhow!("Failed to write wave to stream"));
         }
     }
 
-    stdout.flush().context("Failed to flush stdout")
+    writer.flush().context("Failed to flush stream")
+}
+
+fn write_to_stdout(data: &[f64]) -> Result<(), anyhow::Error> {
+    write_to_stream(std::io::stdout().lock(), data)
 }
 
 fn read_from_stdin() -> Result<Vec<f64>, anyhow::Error> {
@@ -590,5 +592,60 @@ mod tests {
             cutoff_high: 0.1,
         };
         assert!(dc.validate().is_err());
+    }
+
+    // --- write_to_stream ---
+
+    fn read_le_f64s(bytes: &[u8]) -> Vec<f64> {
+        read_f64_stream(Cursor::new(bytes.to_vec())).unwrap()
+    }
+
+    #[test]
+    fn write_to_stream_empty() {
+        let mut buf: Vec<u8> = Vec::new();
+        write_to_stream(&mut buf, &[]).unwrap();
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn write_to_stream_single_value() {
+        let mut buf: Vec<u8> = Vec::new();
+        write_to_stream(&mut buf, &[42.0f64]).unwrap();
+        assert_eq!(buf.len(), 8); // one f64 = 8 bytes
+        let readback = read_le_f64s(&buf);
+        assert!(approx_eq(readback[0], 42.0, EPSILON));
+    }
+
+    #[test]
+    fn write_to_stream_known_values() {
+        let values = [1.0f64, -2.5, 0.0, 1234.5678];
+        let mut buf: Vec<u8> = Vec::new();
+        write_to_stream(&mut buf, &values).unwrap();
+        assert_eq!(buf.len(), values.len() * 8);
+        let readback = read_le_f64s(&buf);
+        for (a, b) in readback.iter().zip(values.iter()) {
+            assert!(approx_eq(*a, *b, EPSILON));
+        }
+    }
+
+    #[test]
+    fn write_to_stream_preserves_order() {
+        let values: Vec<f64> = (0..8).map(|i| i as f64).collect();
+        let mut buf: Vec<u8> = Vec::new();
+        write_to_stream(&mut buf, &values).unwrap();
+        let readback = read_le_f64s(&buf);
+        assert_eq!(readback, values);
+    }
+
+    #[test]
+    fn write_to_stream_roundtrip_with_read_f64_stream() {
+        // Data written by write_to_stream must be recovered exactly by read_f64_stream.
+        let values = [0.1f64, -99.9, f64::MAX, f64::MIN_POSITIVE];
+        let mut buf: Vec<u8> = Vec::new();
+        write_to_stream(&mut buf, &values).unwrap();
+        let readback = read_f64_stream(Cursor::new(buf)).unwrap();
+        for (a, b) in readback.iter().zip(values.iter()) {
+            assert!(approx_eq(*a, *b, EPSILON));
+        }
     }
 }
