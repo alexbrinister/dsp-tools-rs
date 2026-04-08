@@ -396,3 +396,245 @@ fn pad_to_pow2(data: &mut Vec<f64>) {
         data.resize(new_byte_count, 0.0);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use byteorder::WriteBytesExt;
+    use std::io::Cursor;
+
+    const EPSILON: f64 = 1e-10;
+
+    fn approx_eq(a: f64, b: f64, eps: f64) -> bool {
+        (a - b).abs() < eps
+    }
+
+    // --- parse_finite_gt0_f64 ---
+
+    #[test]
+    fn parse_finite_gt0_f64_valid_positive() {
+        let result = parse_finite_gt0_f64("1.5").unwrap();
+        assert!(approx_eq(result, 1.5, EPSILON));
+    }
+
+    #[test]
+    fn parse_finite_gt0_f64_zero() {
+        assert!(parse_finite_gt0_f64("0.0").is_err());
+    }
+
+    #[test]
+    fn parse_finite_gt0_f64_negative() {
+        assert!(parse_finite_gt0_f64("-1.0").is_err());
+    }
+
+    #[test]
+    fn parse_finite_gt0_f64_nan() {
+        assert!(parse_finite_gt0_f64("NaN").is_err());
+    }
+
+    #[test]
+    fn parse_finite_gt0_f64_infinity() {
+        assert!(parse_finite_gt0_f64("inf").is_err());
+    }
+
+    #[test]
+    fn parse_finite_gt0_f64_non_numeric() {
+        assert!(parse_finite_gt0_f64("abc").is_err());
+    }
+
+    // --- parse_gt0_odd ---
+
+    #[test]
+    fn parse_gt0_odd_valid_odd() {
+        assert_eq!(parse_gt0_odd("31").unwrap(), 31);
+    }
+
+    #[test]
+    fn parse_gt0_odd_one() {
+        assert_eq!(parse_gt0_odd("1").unwrap(), 1);
+    }
+
+    #[test]
+    fn parse_gt0_odd_even() {
+        assert!(parse_gt0_odd("32").is_err());
+    }
+
+    #[test]
+    fn parse_gt0_odd_zero() {
+        assert!(parse_gt0_odd("0").is_err());
+    }
+
+    #[test]
+    fn parse_gt0_odd_non_numeric() {
+        assert!(parse_gt0_odd("abc").is_err());
+    }
+
+    // --- try_get_frequency_ratio ---
+
+    #[test]
+    fn try_get_frequency_ratio_valid() {
+        let fc = try_get_frequency_ratio(1000.0, 8000.0).unwrap();
+        assert!(approx_eq(fc, 0.125, EPSILON));
+    }
+
+    #[test]
+    fn try_get_frequency_ratio_nyquist_exact() {
+        // fc == 0.5 is on the boundary and must succeed (check is fc > 0.5)
+        let fc = try_get_frequency_ratio(4000.0, 8000.0).unwrap();
+        assert!(approx_eq(fc, 0.5, EPSILON));
+    }
+
+    #[test]
+    fn try_get_frequency_ratio_exceeds_nyquist() {
+        assert!(try_get_frequency_ratio(5000.0, 8000.0).is_err());
+    }
+
+    // --- format_output ---
+
+    #[test]
+    fn format_output_empty_input() {
+        let empty: Vec<Complex<f64>> = vec![];
+        for fmt in [
+            OutputFormat::Magnitude,
+            OutputFormat::Power,
+            OutputFormat::Phase,
+            OutputFormat::Complex,
+        ] {
+            assert!(format_output(&empty, fmt).is_empty());
+        }
+    }
+
+    #[test]
+    fn format_output_magnitude() {
+        let input = vec![Complex::new(3.0, 4.0)];
+        let out = format_output(&input, OutputFormat::Magnitude);
+        assert_eq!(out.len(), 1);
+        assert!(approx_eq(out[0], 5.0, EPSILON)); // sqrt(9+16) = 5
+    }
+
+    #[test]
+    fn format_output_power() {
+        let input = vec![Complex::new(3.0, 4.0)];
+        let out = format_output(&input, OutputFormat::Power);
+        assert_eq!(out.len(), 1);
+        assert!(approx_eq(out[0], 25.0, EPSILON)); // 9+16 = 25
+    }
+
+    #[test]
+    fn format_output_phase() {
+        // A purely imaginary number has phase π/2
+        let input = vec![Complex::new(0.0, 1.0)];
+        let out = format_output(&input, OutputFormat::Phase);
+        assert_eq!(out.len(), 1);
+        assert!(approx_eq(out[0], std::f64::consts::FRAC_PI_2, EPSILON));
+    }
+
+    #[test]
+    fn format_output_complex_interleaved() {
+        let input = vec![Complex::new(1.0, 2.0), Complex::new(3.0, 4.0)];
+        let out = format_output(&input, OutputFormat::Complex);
+        assert_eq!(out.len(), 4); // 2× input length
+        assert!(approx_eq(out[0], 1.0, EPSILON));
+        assert!(approx_eq(out[1], 2.0, EPSILON));
+        assert!(approx_eq(out[2], 3.0, EPSILON));
+        assert!(approx_eq(out[3], 4.0, EPSILON));
+    }
+
+    // --- pad_to_pow2 ---
+
+    #[test]
+    fn pad_to_pow2_already_power_of_two() {
+        let mut data = vec![1.0f64; 8];
+        pad_to_pow2(&mut data);
+        assert_eq!(data.len(), 8);
+    }
+
+    #[test]
+    fn pad_to_pow2_not_power_of_two() {
+        let mut data = vec![1.0f64; 5];
+        pad_to_pow2(&mut data);
+        assert_eq!(data.len(), 8);
+    }
+
+    #[test]
+    fn pad_to_pow2_padding_is_zeros() {
+        let mut data = vec![1.0f64; 5];
+        pad_to_pow2(&mut data);
+        for &val in &data[5..] {
+            assert!(approx_eq(val, 0.0, EPSILON));
+        }
+    }
+
+    #[test]
+    fn pad_to_pow2_empty() {
+        let mut data: Vec<f64> = vec![];
+        pad_to_pow2(&mut data);
+        assert!(data.is_empty());
+    }
+
+    #[test]
+    fn pad_to_pow2_single_element() {
+        let mut data = vec![42.0f64];
+        pad_to_pow2(&mut data);
+        assert_eq!(data.len(), 1);
+        assert!(approx_eq(data[0], 42.0, EPSILON));
+    }
+
+    // --- read_f64_stream ---
+
+    fn make_le_f64_bytes(values: &[f64]) -> Vec<u8> {
+        let mut buf: Vec<u8> = Vec::with_capacity(values.len() * 8);
+        for &v in values {
+            buf.write_f64::<LittleEndian>(v).unwrap();
+        }
+        buf
+    }
+
+    #[test]
+    fn read_f64_stream_empty_reader() {
+        let cursor = Cursor::new(vec![]);
+        let result = read_f64_stream(cursor).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn read_f64_stream_known_values() {
+        let values = [1.0f64, -2.5, 0.0, 1234.5678];
+        let bytes = make_le_f64_bytes(&values);
+        let result = read_f64_stream(Cursor::new(bytes)).unwrap();
+        assert_eq!(result.len(), values.len());
+        for (a, b) in result.iter().zip(values.iter()) {
+            assert!(approx_eq(*a, *b, EPSILON));
+        }
+    }
+
+    #[test]
+    fn read_f64_stream_respects_upper_bound() {
+        // Stream has 65537 values but the function must stop at 65536.
+        const UPPER_BOUND: usize = 1 << 16;
+        let values: Vec<f64> = (0..UPPER_BOUND + 1).map(|i| i as f64).collect();
+        let bytes = make_le_f64_bytes(&values);
+        let result = read_f64_stream(Cursor::new(bytes)).unwrap();
+        assert_eq!(result.len(), UPPER_BOUND);
+    }
+
+    // --- DualCutoff::validate ---
+
+    #[test]
+    fn dual_cutoff_validate_valid() {
+        let dc = DualCutoff { cutoff_low: 0.1, cutoff_high: 0.3 };
+        assert!(dc.validate().is_ok());
+    }
+
+    #[test]
+    fn dual_cutoff_validate_equal() {
+        let dc = DualCutoff { cutoff_low: 0.2, cutoff_high: 0.2 };
+        assert!(dc.validate().is_err());
+    }
+
+    #[test]
+    fn dual_cutoff_validate_reversed() {
+        let dc = DualCutoff { cutoff_low: 0.4, cutoff_high: 0.1 };
+        assert!(dc.validate().is_err());
+    }
+}
