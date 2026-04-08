@@ -260,26 +260,26 @@ fn run() -> Result<(), anyhow::Error> {
             let computed_taps = match filter_type {
                 FilterCommand::LowPass(args) => {
                     let fc = try_get_frequency_ratio(args.cutoff, *sample_rate)?;
-                    filter::generate_low_pass(*taps, fc, window_function.clone())
+                    filter::generate_low_pass(*taps, fc, window_function.clone())?
                 }
 
                 FilterCommand::HighPass(args) => {
                     let fc = try_get_frequency_ratio(args.cutoff, *sample_rate)?;
-                    filter::generate_high_pass(*taps, fc, window_function.clone())
+                    filter::generate_high_pass(*taps, fc, window_function.clone())?
                 }
 
                 FilterCommand::BandPass(args) => {
                     args.validate()?;
                     let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)?;
                     let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)?;
-                    filter::generate_band_pass(*taps, fc1, fc2, window_function.clone())
+                    filter::generate_band_pass(*taps, fc1, fc2, window_function.clone())?
                 }
 
                 FilterCommand::Notch(args) => {
                     args.validate()?;
                     let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)?;
                     let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)?;
-                    filter::generate_notch(*taps, fc1, fc2, window_function.clone())
+                    filter::generate_notch(*taps, fc1, fc2, window_function.clone())?
                 }
 
                 FilterCommand::Derivative => vec![0.5, 0.0, -0.5],
@@ -295,7 +295,7 @@ fn run() -> Result<(), anyhow::Error> {
                 }
             };
 
-            let output = filter::apply_fir(&input, &computed_taps);
+            let output = filter::apply_fir(&input, &computed_taps)?;
             write_to_stdout(&output)?;
         }
     }
