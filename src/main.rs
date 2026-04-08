@@ -1,3 +1,4 @@
+use anyhow::{Context, anyhow};
 use byteorder::{LittleEndian, ReadBytesExt};
 use clap::{Parser, Subcommand, ValueEnum};
 use num_complex::Complex;
@@ -80,12 +81,12 @@ pub struct DualCutoff {
 }
 
 impl DualCutoff {
-    fn validate(&self) -> Result<(), String> {
+    fn validate(&self) -> Result<(), anyhow::Error> {
         if self.cutoff_low >= self.cutoff_high {
-            return Err(
+            return Err(anyhow!(
                 "low cutoff frequency must be strictly less than high cutoff frequency."
-                    .to_string(),
-            );
+                    .to_string()
+            ));
         }
 
         Ok(())
@@ -166,6 +167,13 @@ impl fmt::Display for WindowFunction {
 }
 
 fn main() {
+    if let Err(e) = run() {
+        eprintln!("error: {}", e);
+        std::process::exit(2);
+    }
+}
+
+fn run() -> Result<(), anyhow::Error> {
     let cli = Cli::parse();
 
     match &cli.command {
@@ -198,7 +206,7 @@ fn main() {
                 SignalFunction::NoiseG => signal::generate_gaussian_noise(*duration, *sample_rate),
             };
 
-            write_to_stdout(&out);
+            write_to_stdout(&out)?;
         }
 
         Command::Ft {
@@ -210,7 +218,7 @@ fn main() {
             eprintln!("{:>4}transform type: {:?}", "", transform_type);
             eprintln!("{:>4}output format: {:?}", "", output_format);
 
-            let mut data = read_from_stdin();
+            let mut data = read_from_stdin()?;
 
             let out = match transform_type {
                 TransformType::Dft => ft::dft(&data),
@@ -222,7 +230,7 @@ fn main() {
             };
 
             let formatted_out = format_output(&out, output_format.clone());
-            write_to_stdout(&formatted_out);
+            write_to_stdout(&formatted_out)?;
         }
 
         Command::Window { window_function } => {
@@ -230,7 +238,7 @@ fn main() {
             eprintln!("args:");
             eprintln!("{:>4}window function: {}", "", window_function);
 
-            let mut data = read_from_stdin();
+            let mut data = read_from_stdin()?;
 
             match window_function {
                 WindowFunction::Hann => window::apply_hann(&mut data),
@@ -238,7 +246,7 @@ fn main() {
                 WindowFunction::Blackman => window::apply_blackman(&mut data),
             };
 
-            write_to_stdout(&data);
+            write_to_stdout(&data)?;
         }
 
         Command::Filter {
@@ -247,67 +255,31 @@ fn main() {
             window_function,
             filter_type,
         } => {
-            let input = read_from_stdin();
+            let input = read_from_stdin()?;
 
             let computed_taps = match filter_type {
                 FilterCommand::LowPass(args) => {
-                    let fc =
-                        try_get_frequency_ratio(args.cutoff, *sample_rate).unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-
-                    filter::generate_low_pass(*taps, fc, window_function.clone())
+                    let fc = try_get_frequency_ratio(args.cutoff, *sample_rate)?;
+                    filter::generate_low_pass(*taps, fc, window_function.clone())?
                 }
 
                 FilterCommand::HighPass(args) => {
-                    let fc =
-                        try_get_frequency_ratio(args.cutoff, *sample_rate).unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-
-                    filter::generate_high_pass(*taps, fc, window_function.clone())
+                    let fc = try_get_frequency_ratio(args.cutoff, *sample_rate)?;
+                    filter::generate_high_pass(*taps, fc, window_function.clone())?
                 }
 
                 FilterCommand::BandPass(args) => {
-                    if let Err(e) = args.validate() {
-                        eprintln!("{}", e);
-                        std::process::exit(2);
-                    }
-
-                    let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)
-                        .unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-                    let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)
-                        .unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-
-                    filter::generate_band_pass(*taps, fc1, fc2, window_function.clone())
+                    args.validate()?;
+                    let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)?;
+                    let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)?;
+                    filter::generate_band_pass(*taps, fc1, fc2, window_function.clone())?
                 }
 
                 FilterCommand::Notch(args) => {
-                    if let Err(e) = args.validate() {
-                        eprintln!("{}", e);
-                        std::process::exit(2);
-                    }
-
-                    let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)
-                        .unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-                    let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)
-                        .unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(2);
-                        });
-
-                    filter::generate_notch(*taps, fc1, fc2, window_function.clone())
+                    args.validate()?;
+                    let fc1 = try_get_frequency_ratio(args.cutoff_low, *sample_rate)?;
+                    let fc2 = try_get_frequency_ratio(args.cutoff_high, *sample_rate)?;
+                    filter::generate_notch(*taps, fc1, fc2, window_function.clone())?
                 }
 
                 FilterCommand::Derivative => vec![0.5, 0.0, -0.5],
@@ -315,53 +287,48 @@ fn main() {
                 FilterCommand::Matched { template_file } => {
                     let template_path = Path::new(&template_file);
 
-                    match File::open(template_path) {
-                        Ok(file) => {
-                            let mut template_taps = read_f64_stream(file);
-                            template_taps.reverse();
-                            template_taps
-                        }
+                    let file = File::open(template_path).context("cannot access template file")?;
 
-                        Err(error) => {
-                            eprintln!("error: cannot access template file: '{}'", error);
-                            std::process::exit(2);
-                        }
-                    }
+                    let mut template_taps = read_f64_stream(file)?;
+                    template_taps.reverse();
+                    template_taps
                 }
             };
 
-            let output = filter::apply_fir(&input, &computed_taps);
-            write_to_stdout(&output);
+            let output = filter::apply_fir(&input, &computed_taps)?;
+            write_to_stdout(&output)?;
         }
     }
+
+    Ok(())
 }
 
-fn parse_finite_gt0_f64(arg: &str) -> Result<f64, String> {
+fn parse_finite_gt0_f64(arg: &str) -> Result<f64, anyhow::Error> {
     let val: f64 = arg
         .parse()
-        .map_err(|_| "value must be a valid number".to_string())?;
+        .context("value must be a valid number".to_string())?;
     if val.is_finite() && val > 0.0 {
         return Ok(val);
     }
 
-    Err("value out of range 0.0 < x < NaN".to_string())
+    Err(anyhow!("value out of range 0.0 < x < NaN".to_string()))
 }
 
-fn parse_gt0_odd(arg: &str) -> Result<usize, String> {
+fn parse_gt0_odd(arg: &str) -> Result<usize, anyhow::Error> {
     let val: usize = arg
         .parse()
-        .map_err(|_| "value must be a valid integer".to_string())?;
+        .context("value must be a valid integer".to_string())?;
     if val % 2 == 0 {
-        return Err("value must be odd".to_string());
+        return Err(anyhow!("value must be odd".to_string()));
     }
 
     Ok(val)
 }
 
-fn try_get_frequency_ratio(cutoff: f64, sample_rate: f64) -> Result<f64, String> {
+fn try_get_frequency_ratio(cutoff: f64, sample_rate: f64) -> Result<f64, anyhow::Error> {
     let fc = cutoff / sample_rate;
     if fc > 0.5 {
-        return Err(format!(
+        return Err(anyhow!(
             "error: cutoff frequency {0} is past Nyquist limit",
             cutoff
         ));
@@ -370,24 +337,28 @@ fn try_get_frequency_ratio(cutoff: f64, sample_rate: f64) -> Result<f64, String>
     Ok(fc)
 }
 
-fn write_to_stdout(data: &[f64]) {
+fn write_to_stdout(data: &[f64]) -> Result<(), anyhow::Error> {
     let mut stdout = std::io::stdout().lock();
 
     for val in data {
-        stdout
-            .write_all(&val.to_le_bytes())
-            .expect("Failed to write wave to stdout");
+        if let Err(e) = stdout.write_all(&val.to_le_bytes()) {
+            if e.kind() == std::io::ErrorKind::BrokenPipe {
+                return Ok(());
+            }
+
+            return Err(anyhow!("Failed to write wave to stdout"));
+        }
     }
 
-    stdout.flush().expect("Failed to flush stdout");
+    stdout.flush().context("Failed to flush stdout")
 }
 
-fn read_from_stdin() -> Vec<f64> {
+fn read_from_stdin() -> Result<Vec<f64>, anyhow::Error> {
     let stdin = std::io::stdin().lock();
     read_f64_stream(stdin)
 }
 
-fn read_f64_stream<R: Read>(reader: R) -> Vec<f64> {
+fn read_f64_stream<R: Read>(reader: R) -> Result<Vec<f64>, anyhow::Error> {
     // take in no more than 65536 values
     const UPPER_INPUT_BOUND: usize = 1 << 16;
     let mut data = Vec::with_capacity(UPPER_INPUT_BOUND);
@@ -407,12 +378,12 @@ fn read_f64_stream<R: Read>(reader: R) -> Vec<f64> {
             // if any other error, we panic
             Err(error) => match error.kind() {
                 std::io::ErrorKind::UnexpectedEof => break,
-                _ => panic!("I/O error reading stream: {}", error),
+                _ => return Err(anyhow!("I/O error reading stream")),
             },
         }
     }
 
-    data
+    Ok(data)
 }
 
 fn format_output(complex_data: &[Complex<f64>], output_format: OutputFormat) -> Vec<f64> {
