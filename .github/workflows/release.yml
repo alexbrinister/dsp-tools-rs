@@ -46,6 +46,6 @@ jobs:
         with:
           # (optional) Tells the action to compress using tar.gz to match our binstall config
           archive: $bin-$target
-          bin: dsp-tools
+          bin: dsp_tools
           target: ${{ matrix.target }}
           token: ${{ secrets.GITHUB_TOKEN }}
