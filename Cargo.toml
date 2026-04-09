@@ -11,3 +11,8 @@ num-complex = "0.4.6"
 rand = "0.10.0"
 rand_distr = "0.6.0"
 thiserror = "2.0.18"
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
+bin-dir = "{ name }-{ target }/{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
