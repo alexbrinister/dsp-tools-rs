@@ -1,10 +1,15 @@
+/// Supported window functions.
 #[derive(Clone, Debug, PartialEq)]
 pub enum WindowFunction {
+    /// The Hann window.
     Hann,
+    /// The Hamming window.
     Hamming,
+    /// The Blackman window.
     Blackman,
 }
 
+/// Applies the Hann window function to the provided data in-place.
 pub fn apply_hann(data: &mut [f64]) {
     if data.len() <= 1 {
         return;
@@ -21,6 +26,7 @@ pub fn apply_hann(data: &mut [f64]) {
     });
 }
 
+/// Applies the Hamming window function to the provided data in-place.
 pub fn apply_hamming(data: &mut [f64]) {
     if data.len() <= 1 {
         return;
@@ -37,6 +43,7 @@ pub fn apply_hamming(data: &mut [f64]) {
     });
 }
 
+/// Applies the Blackman window function to the provided data in-place.
 pub fn apply_blackman(data: &mut [f64]) {
     if data.len() <= 1 {
         return;

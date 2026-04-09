@@ -2,18 +2,23 @@ use crate::window;
 use crate::window::WindowFunction;
 use thiserror::Error;
 
+/// An error that can occur during filter generation or application.
 #[derive(Error, Debug)]
 pub enum FilterError {
+    /// Number of filter taps is zero.
     #[error("number of taps must be greater than 0")]
     ZeroTaps,
 
+    /// The cutoff frequency exceeds the Nyquist limit.
     #[error("cutoff frequency ({0}) is past the Nyquist limit of 0.5")]
     NyquistLimitExceeded(f64),
 
+    /// The lower cutoff frequency is greater than or equal to the upper cutoff frequency.
     #[error("lower cutoff ({0}) must be less than upper cutoff ({1})")]
     InvalidBand(f64, f64),
 }
 
+/// Applies a Finite Impulse Response (FIR) filter to an input signal.
 pub fn apply_fir(input: &[f64], taps: &[f64]) -> Result<Vec<f64>, FilterError> {
     if taps.is_empty() {
         return Err(FilterError::ZeroTaps);
@@ -27,6 +32,7 @@ pub fn apply_fir(input: &[f64], taps: &[f64]) -> Result<Vec<f64>, FilterError> {
         .collect())
 }
 
+/// Generates the coefficients for a low-pass FIR filter.
 pub fn generate_low_pass(
     num_taps: usize,
     fc: f64,
@@ -69,6 +75,7 @@ pub fn generate_low_pass(
     Ok(output)
 }
 
+/// Generates the coefficients for a high-pass FIR filter.
 pub fn generate_high_pass(
     num_taps: usize,
     fc: f64,
@@ -82,6 +89,7 @@ pub fn generate_high_pass(
     Ok(low_pass)
 }
 
+/// Generates the coefficients for a band-pass FIR filter.
 pub fn generate_band_pass(
     num_taps: usize,
     fc1: f64,
@@ -110,6 +118,7 @@ pub fn generate_band_pass(
         .collect())
 }
 
+/// Generates the coefficients for a notch (band-stop) FIR filter.
 pub fn generate_notch(
     num_taps: usize,
     fc1: f64,

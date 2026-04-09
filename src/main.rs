@@ -9,70 +9,93 @@ use std::path::Path;
 
 use dsp_tools::{filter, ft, signal, window};
 
+/// The main CLI application struct.
 #[derive(Parser)]
 #[command(name = "DSP CLI")]
 #[command(version = "0.1.0")]
 #[command(about = "a DSP toolkit CLI", long_about = None)]
 struct Cli {
+    /// The command to run.
     #[command(subcommand)]
     command: Command,
 }
 
+/// Available commands in the DSP toolkit.
 #[derive(Subcommand)]
 enum Command {
+    /// Generates a signal.
     Signal {
+        /// The type of signal to generate.
         #[arg(short, long)]
         function: SignalFunction,
 
+        /// The sample rate of the signal in Hz.
         #[arg(short, long)]
         sample_rate: f64,
 
+        /// The frequency of the signal in Hz (for sine, cosine, square).
         #[arg(short = 'w', long)]
         frequency: f64,
 
+        /// The duration of the signal in seconds.
         #[arg(short, long)]
         duration: f64,
     },
 
+    /// Performs a Fourier Transform on the input signal.
     Ft {
+        /// The type of Fourier transform to apply (DFT or FFT).
         #[arg(short, long)]
         transform_type: TransformType,
 
+        /// The output format for the complex transform results.
         #[arg(short, long, default_value_t = OutputFormat::Magnitude)]
         output_format: OutputFormat,
     },
 
+    /// Applies a window function to the input signal.
     Window {
+        /// The type of window function to apply.
         #[arg(short = 'z', long)]
         window_function: CliWindowFunction,
     },
 
+    /// Applies a digital filter to the input signal.
     Filter {
+        /// The sample rate of the signal in Hz.
         #[arg(short, long, value_parser = parse_finite_gt0_f64)]
         sample_rate: f64,
 
+        /// The number of taps for the FIR filter (must be odd).
         #[arg(short = 'n', long, value_parser = parse_gt0_odd)]
         taps: usize,
 
+        /// The window function to use for filter design.
         #[arg(short = 'z', long, default_value_t = CliWindowFunction::Blackman)]
         window_function: CliWindowFunction,
 
+        /// The type of filter to apply.
         #[command(subcommand)]
         filter_type: FilterCommand,
     },
 }
 
+/// Arguments for filters that require a single cutoff frequency.
 #[derive(clap::Args, Debug, Clone)]
 pub struct SingleCutoff {
+    /// The cutoff frequency in Hz.
     #[arg(short, long, value_parser = parse_finite_gt0_f64)]
     pub cutoff: f64,
 }
 
+/// Arguments for filters that require a low and high cutoff frequency.
 #[derive(clap::Args, Debug, Clone)]
 pub struct DualCutoff {
+    /// The lower cutoff frequency in Hz.
     #[arg(short = 'l', long, value_parser = parse_finite_gt0_f64)]
     pub cutoff_low: f64,
 
+    /// The upper cutoff frequency in Hz.
     #[arg(short = 'a', long, value_parser = parse_finite_gt0_f64)]
     pub cutoff_high: f64,
 }
@@ -90,51 +113,77 @@ impl DualCutoff {
     }
 }
 
+/// Available filter types.
 #[derive(Subcommand)]
 enum FilterCommand {
+    /// Low-pass filter.
     LowPass(SingleCutoff),
 
+    /// High-pass filter.
     HighPass(SingleCutoff),
 
+    /// Band-pass filter.
     BandPass(DualCutoff),
 
+    /// Notch (band-stop) filter.
     Notch(DualCutoff),
 
+    /// Derivative filter.
     Derivative,
 
+    /// Matched filter using a template file.
     Matched {
+        /// Path to the template file.
         #[arg(long)]
         template_file: String,
     },
 }
 
+/// The type of signal to generate.
 #[derive(ValueEnum, Clone, Debug)]
 enum SignalFunction {
+    /// Square wave.
     Square,
+    /// Sine wave.
     Sine,
+    /// Cosine wave.
     Cosine,
+    /// Gaussian noise.
     NoiseG,
+    /// White noise.
     NoiseW,
 }
 
+/// The type of Fourier Transform to perform.
 #[derive(ValueEnum, Clone, Debug)]
 enum TransformType {
+    /// Discrete Fourier Transform.
     Dft,
+    /// Fast Fourier Transform.
     Fft,
 }
 
+/// Output format for Fourier Transform results.
 #[derive(ValueEnum, Clone, Debug)]
 enum OutputFormat {
+    /// Magnitude of complex numbers.
     Magnitude,
+    /// Power (squared magnitude) of complex numbers.
     Power,
+    /// Phase of complex numbers.
     Phase,
+    /// Real and imaginary parts interleaved.
     Complex,
 }
 
+/// Window functions available in the CLI.
 #[derive(ValueEnum, Clone, Debug)]
 pub enum CliWindowFunction {
+    /// Hann window.
     Hann,
+    /// Hamming window.
     Hamming,
+    /// Blackman window.
     Blackman,
 }
 

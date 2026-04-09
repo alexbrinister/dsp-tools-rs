@@ -5,6 +5,7 @@ fn get_sample_count(duration: f64, sample_rate: f64) -> usize {
     (duration * sample_rate).ceil() as usize
 }
 
+/// Generates a sine wave.
 pub fn generate_sine(frequency: f64, duration: f64, sample_rate: f64) -> Vec<f64> {
     let sample_count = get_sample_count(duration, sample_rate);
 
@@ -17,6 +18,7 @@ pub fn generate_sine(frequency: f64, duration: f64, sample_rate: f64) -> Vec<f64
         .collect()
 }
 
+/// Generates a cosine wave.
 pub fn generate_cosine(frequency: f64, duration: f64, sample_rate: f64) -> Vec<f64> {
     let sample_count = get_sample_count(duration, sample_rate);
 
@@ -29,6 +31,7 @@ pub fn generate_cosine(frequency: f64, duration: f64, sample_rate: f64) -> Vec<f
         .collect()
 }
 
+/// Generates a square wave.
 pub fn generate_square(frequency: f64, duration: f64, sample_rate: f64) -> Vec<f64> {
     let sample_count = get_sample_count(duration, sample_rate);
     let period = 1.0 / frequency;
@@ -45,6 +48,7 @@ pub fn generate_square(frequency: f64, duration: f64, sample_rate: f64) -> Vec<f
         .collect()
 }
 
+/// Generates white noise in the range [-1.0, 1.0).
 pub fn generate_white_noise(duration: f64, sample_rate: f64) -> Vec<f64> {
     let sample_count = get_sample_count(duration, sample_rate);
     let mut rng = rand::rng();
@@ -54,6 +58,7 @@ pub fn generate_white_noise(duration: f64, sample_rate: f64) -> Vec<f64> {
         .collect()
 }
 
+/// Generates normally distributed noise, bounded mainly in [-1.0, 1.0].
 pub fn generate_gaussian_noise(duration: f64, sample_rate: f64) -> Vec<f64> {
     let sample_count = get_sample_count(duration, sample_rate);
     let mut rng = rand::rng();

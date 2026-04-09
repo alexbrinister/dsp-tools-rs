@@ -1,5 +1,6 @@
 use num_complex::Complex;
 
+/// Computes the Discrete Fourier Transform (DFT) of the input signal.
 pub fn dft(input: &[f64]) -> Vec<Complex<f64>> {
     let length: usize = input.len();
     let len64 = length as f64;
@@ -32,6 +33,7 @@ fn bit_reverse_permutation(data: &mut [Complex<f64>]) {
     }
 }
 
+/// Computes the Fast Fourier Transform (FFT) of the input signal.
 pub fn fft(input: &[f64]) -> Vec<Complex<f64>> {
     let n = input.len();
 

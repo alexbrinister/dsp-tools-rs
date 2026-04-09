@@ -34,7 +34,7 @@ jobs:
         uses: taiki-e/create-gh-release-action@v1
         with:
           # Mark as pre-release as requested
-          pre-release: true
+          draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
   # 3. Build and upload pre-compiled binaries for binstall
