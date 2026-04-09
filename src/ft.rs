@@ -1,6 +1,100 @@
+//! Fourier transforms for frequency-domain analysis.
+//!
+//! Two implementations are provided:
+//!
+//! - [`dft`](crate::ft::dft) — Naïve O(N²) Discrete Fourier Transform. Works on any input
+//!   length. Suitable for short signals or correctness verification.
+//! - [`fft`](crate::ft::fft) — O(N log N) Cooley-Tukey radix-2 FFT. Automatically zero-pads
+//!   non-power-of-two inputs to the next power of two before processing.
+//!
+//! Both functions return `Vec<Complex<f64>>` where element `k` represents the
+//! complex amplitude at frequency `k · fs / N` Hz (with `fs` the sample rate
+//! and `N` the transform length).
+//!
+//! ## Choosing DFT vs FFT
+//!
+//! | | [`dft`](crate::ft::dft) | [`fft`](crate::ft::fft) |
+//! |-|-------------------------|-------------------------|
+//! | Complexity | O(N²) | O(N log N) |
+//! | Input length | Any | Any (zero-padded to power of two) |
+//! | Use case | Short signals, reference | Production use |
+//!
+//! ## Interpreting the Output
+//!
+//! The output vector has length `N` (or the padded length for [`fft`](crate::ft::fft)).
+//! Bins `0` through `N/2` correspond to frequencies `0` through `fs/2`
+//! (the Nyquist frequency). Bins `N/2 + 1` through `N - 1` are the negative
+//! frequencies and mirror the positive side for real-valued input.
+//!
+//! Common post-processing operations on each [`num_complex::Complex`] bin:
+//!
+//! | Quantity | Expression |
+//! |----------|------------|
+//! | Magnitude | `bin.norm()` |
+//! | Power | `bin.norm_sqr()` |
+//! | Phase | `bin.arg()` |
+
 use num_complex::Complex;
 
-/// Computes the Discrete Fourier Transform (DFT) of the input signal.
+/// Computes the Discrete Fourier Transform (DFT) of a real-valued signal.
+///
+/// The DFT is defined as:
+///
+/// ```text
+/// X[k] = Σ_{n=0}^{N-1}  x[n] · e^{−j 2π k n / N}
+/// ```
+///
+/// where `N = input.len()` and `k` is the frequency bin index. This is a
+/// direct O(N²) implementation. For large signals, prefer [`fft`].
+///
+/// # Arguments
+///
+/// * `input` — Real-valued time-domain samples.
+///
+/// # Returns
+///
+/// A [`Vec<Complex<f64>>`] of length `N`. The magnitude of bin `k` indicates
+/// how strongly frequency `k · fs / N` is present in the signal.
+///
+/// # Examples
+///
+/// A constant (DC) signal concentrates all energy at bin 0:
+///
+/// ```
+/// use dsp_tools::ft::dft;
+///
+/// let input = vec![1.0f64; 8];
+/// let output = dft(&input);
+///
+/// // Bin 0 equals the sum of all samples
+/// assert!((output[0].re - 8.0).abs() < 1e-10);
+/// assert!(output[0].im.abs() < 1e-10);
+///
+/// // All other bins are zero for a DC signal
+/// for bin in &output[1..] {
+///     assert!(bin.norm() < 1e-10);
+/// }
+/// ```
+///
+/// A unit cosine at bin `k=1` over `N=8` samples produces magnitude `N/2`
+/// at bins 1 and `N-1`, and zero everywhere else:
+///
+/// ```
+/// use dsp_tools::ft::dft;
+/// use std::f64::consts::PI;
+///
+/// let n = 8usize;
+/// let input: Vec<f64> = (0..n)
+///     .map(|i| (2.0 * PI * i as f64 / n as f64).cos())
+///     .collect();
+/// let output = dft(&input);
+///
+/// assert!((output[1].norm() - 4.0).abs() < 1e-10);
+/// assert!((output[n - 1].norm() - 4.0).abs() < 1e-10);
+/// for k in 2..(n - 1) {
+///     assert!(output[k].norm() < 1e-10);
+/// }
+/// ```
 pub fn dft(input: &[f64]) -> Vec<Complex<f64>> {
     let length: usize = input.len();
     let len64 = length as f64;
@@ -33,7 +127,82 @@ fn bit_reverse_permutation(data: &mut [Complex<f64>]) {
     }
 }
 
-/// Computes the Fast Fourier Transform (FFT) of the input signal.
+/// Computes the Fast Fourier Transform (FFT) of a real-valued signal.
+///
+/// Uses the Cooley-Tukey radix-2 decimation-in-time algorithm. The input is
+/// converted to complex form, then an in-place butterfly computation produces
+/// the frequency-domain output. The mathematical result is identical to
+/// [`dft`]:
+///
+/// ```text
+/// X[k] = Σ_{n=0}^{N-1}  x[n] · e^{−j 2π k n / N}
+/// ```
+///
+/// ## Zero-padding
+///
+/// If `input.len()` is not a power of two, the internal buffer is extended
+/// with zeros to `input.len().next_power_of_two()` before the transform runs.
+/// The returned vector has this padded length, not the original input length.
+/// Zero-padding increases frequency resolution in the output but does not add
+/// information — it interpolates between the "true" DFT bins.
+///
+/// # Arguments
+///
+/// * `input` — Real-valued time-domain samples. Any length is accepted.
+///
+/// # Returns
+///
+/// A [`Vec<Complex<f64>>`] whose length is `input.len()` rounded up to the
+/// next power of two (unchanged if already a power of two).
+///
+/// # Examples
+///
+/// Basic FFT of a DC signal:
+///
+/// ```
+/// use dsp_tools::ft::fft;
+///
+/// let input = vec![1.0f64; 8];
+/// let output = fft(&input);
+///
+/// assert_eq!(output.len(), 8);
+/// assert!((output[0].re - 8.0).abs() < 1e-10);
+/// for bin in &output[1..] {
+///     assert!(bin.norm() < 1e-10);
+/// }
+/// ```
+///
+/// Non-power-of-two input is zero-padded automatically:
+///
+/// ```
+/// use dsp_tools::ft::fft;
+///
+/// let input = vec![1.0f64; 5]; // 5 is not a power of two → padded to 8
+/// let output = fft(&input);
+///
+/// assert_eq!(output.len(), 8);
+/// // DC bin equals the sum of the original (non-zero-padded) samples
+/// assert!((output[0].re - 5.0).abs() < 1e-10);
+/// ```
+///
+/// FFT and DFT produce equivalent results for power-of-two inputs:
+///
+/// ```
+/// use dsp_tools::ft::{dft, fft};
+/// use std::f64::consts::PI;
+///
+/// let input: Vec<f64> = (0..16)
+///     .map(|i| (2.0 * PI * 3.0 * i as f64 / 16.0).sin())
+///     .collect();
+///
+/// let dft_out = dft(&input);
+/// let fft_out = fft(&input);
+///
+/// for (d, f) in dft_out.iter().zip(fft_out.iter()) {
+///     assert!((d.re - f.re).abs() < 1e-9);
+///     assert!((d.im - f.im).abs() < 1e-9);
+/// }
+/// ```
 pub fn fft(input: &[f64]) -> Vec<Complex<f64>> {
     let n = input.len();
 
